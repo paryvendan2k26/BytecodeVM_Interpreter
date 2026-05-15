@@ -67,6 +67,39 @@ void Compiler::compile(AST* node) {
         return;
     }
 
+    CompareNode* compareNode =
+    dynamic_cast<CompareNode*>(node);
+
+        if (compareNode != nullptr) {
+
+            compile(compareNode->left);
+
+            compile(compareNode->right);
+
+            if (compareNode->op == ">") {
+
+                instructions.push_back(
+                    Instruction(OP_COMPARE_GT)
+                );
+            }
+
+            else if (compareNode->op == "<") {
+
+                instructions.push_back(
+                    Instruction(OP_COMPARE_LT)
+                );
+            }
+
+            else if (compareNode->op == "==") {
+
+                instructions.push_back(
+                    Instruction(OP_COMPARE_EQ)
+                );
+            }
+
+            return;
+        }
+
     BinaryOpNode* binNode =
         dynamic_cast<BinaryOpNode*>(node);
 

@@ -100,6 +100,45 @@ int VM::run(
 
                 break;
             }
+
+            case OP_COMPARE_GT: {
+
+                int b = stack.back();
+                stack.pop_back();
+
+                int a = stack.back();
+                stack.pop_back();
+
+                stack.push_back(a > b);
+
+                break;
+            }
+
+            case OP_COMPARE_LT: {
+
+                int b = stack.back();
+                stack.pop_back();
+
+                int a = stack.back();
+                stack.pop_back();
+
+                stack.push_back(a < b);
+
+                break;
+            }
+
+            case OP_COMPARE_EQ: {
+
+                int b = stack.back();
+                stack.pop_back();
+
+                int a = stack.back();
+                stack.pop_back();
+
+                stack.push_back(a == b);
+
+                break;
+            }
         }
 
         ip++;

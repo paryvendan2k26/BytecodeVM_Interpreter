@@ -10,8 +10,8 @@ using namespace std;
 int main() {
 
 string input =
-"x=10 x+5";
-    Lexer lexer(input);
+"x = 5 x == 5"; 
+Lexer lexer(input);
 
     vector<Token> tokens =
         lexer.tokenize();
