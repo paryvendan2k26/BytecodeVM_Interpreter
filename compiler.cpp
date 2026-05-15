@@ -1,0 +1,110 @@
+#include "compiler.h"
+
+using namespace std;
+
+void Compiler::compile(AST* node) {
+
+            VariableNode* varNode =
+            dynamic_cast<VariableNode*>(node);
+
+        if (varNode != nullptr) {
+
+            instructions.push_back(
+                Instruction(
+                    OP_LOAD_NAME,
+                    varNode->name
+                )
+            );
+
+            return;
+        }
+
+        AssignNode* assignNode =
+            dynamic_cast<AssignNode*>(node);
+
+        if (assignNode != nullptr) {
+
+            compile(assignNode->value);
+
+            instructions.push_back(
+                Instruction(
+                    OP_STORE_NAME,
+                    assignNode->name
+                )
+            );
+
+            return;
+        }
+
+        ProgramNode* programNode =
+            dynamic_cast<ProgramNode*>(node);
+
+        if (programNode != nullptr) {
+
+            for (
+                AST* stmt :
+                programNode->statements
+            ) {
+
+                compile(stmt);
+            }
+
+            return;
+        }
+
+    NumberNode* numberNode =
+        dynamic_cast<NumberNode*>(node);
+
+    if (numberNode != nullptr) {
+
+        instructions.push_back(
+            Instruction(
+                OP_LOAD_CONST,
+                numberNode->value
+            )
+        );
+
+        return;
+    }
+
+    BinaryOpNode* binNode =
+        dynamic_cast<BinaryOpNode*>(node);
+
+    if (binNode != nullptr) {
+
+        compile(binNode->left);
+
+        compile(binNode->right);
+
+        if (binNode->op == "+") {
+
+            instructions.push_back(
+                Instruction(OP_ADD)
+            );
+        }
+
+        else if (binNode->op == "-") {
+
+            instructions.push_back(
+                Instruction(OP_SUB)
+            );
+        }
+
+        else if (binNode->op == "*") {
+
+            instructions.push_back(
+                Instruction(OP_MUL)
+            );
+        }
+
+        else if (binNode->op == "/") {
+
+            instructions.push_back(
+                Instruction(OP_DIV)
+            );
+        }
+
+        return;
+    }
+}
+

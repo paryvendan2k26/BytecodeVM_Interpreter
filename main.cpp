@@ -1,46 +1,41 @@
 #include <iostream>
+
 #include "lexer.h"
 #include "parser.h"
-#include "interpreter.h"
+#include "compiler.h"
+#include "vm.h"
 
 using namespace std;
 
 int main() {
 
-    Interpreter interpreter;
+string input =
+"x=10 x+5";
+    Lexer lexer(input);
 
-    while (true) {
+    vector<Token> tokens =
+        lexer.tokenize();
 
-        string input;
+    Parser parser(tokens);
 
-        cout << ">> ";
+    AST* tree =
+        parser.parse();
 
-        getline(cin, input);
+    Compiler compiler;
 
-        if (
-            input == "exit"
-        ) {
+    compiler.compile(tree);
 
-            break;
-        }
+    VM vm;
 
-        Lexer lexer(input);
+    int result =
+        vm.run(
+            compiler.instructions
+        );
 
-        vector<Token> tokens =
-            lexer.tokenize();
-
-        Parser parser(tokens);
-
-        AST* tree =
-            parser.parse();
-
-        int result =
-            interpreter.visit(tree);
-
-        cout
-            << result
-            << endl;
-    }
+    cout
+        << "Result = "
+        << result
+        << endl;
 
     return 0;
 }
