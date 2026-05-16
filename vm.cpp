@@ -2,9 +2,34 @@
 
 using namespace std;
 
+int VM::getVariable(
+    string name
+) {
+
+    return frames.back()
+        .locals[name];
+}
+
+void VM::setVariable(
+    string name,
+    int value
+) {
+
+    frames.back()
+        .locals[name]
+            = value;
+}
+
+
 int VM::run(
     vector<Instruction>& code
 ) {
+
+    Frame globalFrame;
+
+globalFrame.returnAddress = -1;
+
+frames.push_back(globalFrame);
 
     int ip = 0;
 
@@ -27,9 +52,9 @@ int VM::run(
             case OP_LOAD_NAME: {
 
                 stack.push_back(
-                    variables[
+                    getVariable(
                         instr.argument
-                    ]
+                    )
                 );
 
                 break;
@@ -42,9 +67,10 @@ int VM::run(
 
                 stack.pop_back();
 
-                variables[
-                    instr.argument
-                ] = value;
+                setVariable(
+                    instr.argument,
+                    value
+                );
 
                 break;
             }
