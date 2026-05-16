@@ -2,6 +2,7 @@
 
 #include "lexer.h"
 #include "parser.h"
+
 #include "compiler.h"
 #include "vm.h"
 
@@ -10,8 +11,21 @@ using namespace std;
 int main() {
 
 string input =
-"x = 2 if x > 5 { 100 } else { 200 }";
-Lexer lexer(input);
+
+"fact(5) "
+
+"func fact(n) { "
+
+"if n == 0 { "
+"1 "
+"} "
+
+"else { "
+"n * fact(n - 1) "
+"} "
+
+"}";
+    Lexer lexer(input);
 
     vector<Token> tokens =
         lexer.tokenize();
@@ -27,15 +41,17 @@ Lexer lexer(input);
 
     VM vm;
 
+    vm.functions =
+        compiler.functions;
+
     int result =
         vm.run(
             compiler.instructions
         );
 
-    cout
-        << "Result = "
-        << result
-        << endl;
+    cout << "Result = "
+         << result
+         << endl;
 
     return 0;
 }

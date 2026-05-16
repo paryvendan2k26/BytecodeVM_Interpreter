@@ -4,6 +4,66 @@ using namespace std;
 
 void Compiler::compile(AST* node) {
 
+    FunctionDefNode* funcNode =
+    dynamic_cast<FunctionDefNode*>(node);
+
+        if (funcNode != nullptr) {
+
+            functions[
+                funcNode->name
+            ] = instructions.size();
+
+            for (
+                string param :
+                funcNode->params
+            ) {
+
+                instructions.push_back(
+                    Instruction(
+                        OP_STORE_NAME,
+                        param
+                    )
+                );
+            }
+
+            for (
+                AST* stmt :
+                funcNode->body
+            ) {
+
+                compile(stmt);
+            }
+
+            instructions.push_back(
+                Instruction(OP_RETURN)
+            );
+
+            return;
+        }
+
+        FunctionCallNode* callNode =
+    dynamic_cast<FunctionCallNode*>(node);
+
+            if (callNode != nullptr) {
+
+                for (
+                    AST* arg :
+                    callNode->args
+                ) {
+
+                    compile(arg);
+                }
+
+                instructions.push_back(
+                    Instruction(
+                        OP_CALL,
+                        callNode->name
+                    )
+                );
+
+                return;
+            }
+
             VariableNode* varNode =
             dynamic_cast<VariableNode*>(node);
 
@@ -36,21 +96,74 @@ void Compiler::compile(AST* node) {
             return;
         }
 
-        ProgramNode* programNode =
-            dynamic_cast<ProgramNode*>(node);
+            ProgramNode* programNode =
+                dynamic_cast<ProgramNode*>(node);
 
-        if (programNode != nullptr) {
+            if (programNode != nullptr) {
 
-            for (
-                AST* stmt :
-                programNode->statements
-            ) {
+                int jumpIndex =
+                    instructions.size();
 
-                compile(stmt);
+                instructions.push_back(
+                    Instruction(
+                        OP_JUMP,
+                        "0"
+                    )
+                );
+
+                vector<AST*> functionsList;
+                vector<AST*> mainStatements;
+
+                for (
+                    AST* stmt :
+                    programNode->statements
+                ) {
+
+                    FunctionDefNode* funcNode =
+
+                        dynamic_cast<
+                            FunctionDefNode*
+                        >(stmt);
+
+                    if (funcNode != nullptr) {
+
+                        functionsList.push_back(
+                            stmt
+                        );
+                    }
+
+                    else {
+
+                        mainStatements.push_back(
+                            stmt
+                        );
+                    }
+                }
+
+                for (
+                    AST* stmt :
+                    functionsList
+                ) {
+
+                    compile(stmt);
+                }
+
+                instructions[jumpIndex]
+                    .argument =
+                    to_string(
+                        instructions.size()
+                    );
+
+                for (
+                    AST* stmt :
+                    mainStatements
+                ) {
+
+                    compile(stmt);
+                }
+
+                return;
             }
-
-            return;
-        }
 
     NumberNode* numberNode =
         dynamic_cast<NumberNode*>(node);

@@ -189,6 +189,52 @@ frames.push_back(globalFrame);
 
                 break;
             }
+            case OP_CALL: {
+
+                Frame newFrame;
+
+                newFrame.returnAddress =
+                    ip + 1;
+
+                frames.push_back(
+                    newFrame
+                );
+
+                ip = functions[
+                    instr.argument
+                ];
+
+                continue;
+            }
+            case OP_RETURN: {
+
+                int returnValue =
+                    stack.back();
+
+                stack.pop_back();
+
+                int returnAddress =
+
+                    frames.back()
+                        .returnAddress;
+
+                frames.pop_back();
+
+                if (
+                    returnAddress == -1
+                ) {
+
+                    return returnValue;
+                }
+
+                stack.push_back(
+                    returnValue
+                );
+
+                ip = returnAddress;
+
+                continue;
+            }
         }
 
         ip++;
