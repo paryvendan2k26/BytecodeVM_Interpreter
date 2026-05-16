@@ -100,12 +100,51 @@ void Compiler::compile(AST* node) {
             return;
         }
 
-    IfNode* ifNode =
-    dynamic_cast<IfNode*>(node);
+            IfNode* ifNode =
+            dynamic_cast<IfNode*>(node);
 
-        if (ifNode != nullptr) {
+                if (ifNode != nullptr) {
 
-            compile(ifNode->condition);
+                    compile(ifNode->condition);
+
+                    int jumpIndex =
+                        instructions.size();
+
+                    instructions.push_back(
+                        Instruction(
+                            OP_JUMP_IF_FALSE,
+                            "0"
+                        )
+                    );
+
+                    for (
+                        AST* stmt :
+                        ifNode->ifBody
+                    ) {
+
+                        compile(stmt);
+                    }
+
+                    instructions[jumpIndex]
+                        .argument =
+                        to_string(
+                            instructions.size()
+                        );
+
+                    return;
+                }
+
+                WhileNode* whileNode =
+            dynamic_cast<WhileNode*>(node);
+
+        if (whileNode != nullptr) {
+
+            int loopStart =
+                instructions.size();
+
+            compile(
+                whileNode->condition
+            );
 
             int jumpIndex =
                 instructions.size();
@@ -119,11 +158,18 @@ void Compiler::compile(AST* node) {
 
             for (
                 AST* stmt :
-                ifNode->ifBody
+                whileNode->body
             ) {
 
                 compile(stmt);
             }
+
+            instructions.push_back(
+                Instruction(
+                    OP_JUMP,
+                    to_string(loopStart)
+                )
+            );
 
             instructions[jumpIndex]
                 .argument =
