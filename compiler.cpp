@@ -101,38 +101,62 @@ void Compiler::compile(AST* node) {
         }
 
             IfNode* ifNode =
-            dynamic_cast<IfNode*>(node);
+                dynamic_cast<IfNode*>(node);
 
-                if (ifNode != nullptr) {
+            if (ifNode != nullptr) {
 
-                    compile(ifNode->condition);
+                compile(ifNode->condition);
 
-                    int jumpIndex =
-                        instructions.size();
+                int falseJumpIndex =
+                    instructions.size();
 
-                    instructions.push_back(
-                        Instruction(
-                            OP_JUMP_IF_FALSE,
-                            "0"
-                        )
+                instructions.push_back(
+                    Instruction(
+                        OP_JUMP_IF_FALSE,
+                        "0"
+                    )
+                );
+
+                for (
+                    AST* stmt :
+                    ifNode->ifBody
+                ) {
+
+                    compile(stmt);
+                }
+
+                int endJumpIndex =
+                    instructions.size();
+
+                instructions.push_back(
+                    Instruction(
+                        OP_JUMP,
+                        "0"
+                    )
+                );
+
+                instructions[falseJumpIndex]
+                    .argument =
+                    to_string(
+                        instructions.size()
                     );
 
-                    for (
-                        AST* stmt :
-                        ifNode->ifBody
-                    ) {
+                for (
+                    AST* stmt :
+                    ifNode->elseBody
+                ) {
 
-                        compile(stmt);
-                    }
-
-                    instructions[jumpIndex]
-                        .argument =
-                        to_string(
-                            instructions.size()
-                        );
-
-                    return;
+                    compile(stmt);
                 }
+
+                instructions[endJumpIndex]
+                    .argument =
+                    to_string(
+                        instructions.size()
+                    );
+
+                return;
+            }
 
                 WhileNode* whileNode =
             dynamic_cast<WhileNode*>(node);

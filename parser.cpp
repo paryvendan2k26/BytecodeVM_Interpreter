@@ -122,8 +122,11 @@ AST* Parser::comparison() {
     AST* node = expr();
 
     while (
+
         currentToken.type == GREATER ||
+
         currentToken.type == LESS ||
+
         currentToken.type == EQUAL_EQUAL
     ) {
 
@@ -151,7 +154,10 @@ AST* Parser::ifStatement() {
     AST* condition =
         comparison();
 
-    if (currentToken.type == LBRACE) {
+    if (
+        currentToken.type ==
+        LBRACE
+    ) {
 
         advance();
     }
@@ -159,7 +165,8 @@ AST* Parser::ifStatement() {
     vector<AST*> ifBody;
 
     while (
-        currentToken.type != RBRACE
+        currentToken.type !=
+        RBRACE
     ) {
 
         ifBody.push_back(
@@ -171,17 +178,24 @@ AST* Parser::ifStatement() {
 
     vector<AST*> elseBody;
 
-    if (currentToken.type == ELSE) {
+    if (
+        currentToken.type ==
+        ELSE
+    ) {
 
         advance();
 
-        if (currentToken.type == LBRACE) {
+        if (
+            currentToken.type ==
+            LBRACE
+        ) {
 
             advance();
         }
 
         while (
-            currentToken.type != RBRACE
+            currentToken.type !=
+            RBRACE
         ) {
 
             elseBody.push_back(
