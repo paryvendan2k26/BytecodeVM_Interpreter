@@ -139,6 +139,30 @@ int VM::run(
 
                 break;
             }
+            case OP_JUMP: {
+
+                ip = stoi(instr.argument);
+
+                continue;
+            }
+            case OP_JUMP_IF_FALSE: {
+
+                int condition =
+                    stack.back();
+
+                stack.pop_back();
+
+                if (!condition) {
+
+                    ip = stoi(
+                        instr.argument
+                    );
+
+                    continue;
+                }
+
+                break;
+            }
         }
 
         ip++;

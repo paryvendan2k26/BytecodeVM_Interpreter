@@ -10,7 +10,7 @@ using namespace std;
 int main() {
 
 string input =
-"x = 5 x == 5"; 
+"x = 10 if x > 5 { 100 }"; 
 Lexer lexer(input);
 
     vector<Token> tokens =

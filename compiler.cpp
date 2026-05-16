@@ -100,6 +100,42 @@ void Compiler::compile(AST* node) {
             return;
         }
 
+    IfNode* ifNode =
+    dynamic_cast<IfNode*>(node);
+
+        if (ifNode != nullptr) {
+
+            compile(ifNode->condition);
+
+            int jumpIndex =
+                instructions.size();
+
+            instructions.push_back(
+                Instruction(
+                    OP_JUMP_IF_FALSE,
+                    "0"
+                )
+            );
+
+            for (
+                AST* stmt :
+                ifNode->ifBody
+            ) {
+
+                compile(stmt);
+            }
+
+            instructions[jumpIndex]
+                .argument =
+                to_string(
+                    instructions.size()
+                );
+
+            return;
+        }
+
+        
+
     BinaryOpNode* binNode =
         dynamic_cast<BinaryOpNode*>(node);
 
