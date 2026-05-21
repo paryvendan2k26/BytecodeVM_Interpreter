@@ -1,122 +1,136 @@
 # BytecodeVM Interpreter
 
-A small C++ bytecode interpreter that demonstrates a full language pipeline:
+A custom stack-based bytecode virtual machine and compiler written in modern C++.
+
+This project implements a complete language execution pipeline:
 
 ```text
-source code -> lexer -> parser/AST -> compiler -> bytecode VM
+Source Code → Lexer → Parser → AST → Bytecode Compiler → VM Execution
 ```
 
-The VM currently runs integer-based programs with variables, branching, loops,
-functions, recursion, and basic output.
+Unlike traditional tree-walk interpreters, the AST is compiled into custom bytecode instructions executed by a dedicated virtual machine. The architecture is inspired by CPython, Lua VM, and JVM-style execution models.
 
-## Features
+---
 
-- Integer literals
-- Boolean literals: `true`, `false`
-- Arithmetic: `+`, `-`, `*`, `/`
-- Unary minus: `-value`
-- Variables and assignment
-- Comparisons: `>`, `>=`, `<`, `<=`, `==`, `!=`
-- `if` / `else`
-- `while`
-- Function definitions with `func`
-- Function calls and recursion
-- Explicit returns with `return expr`
-- Console output with `print(expr)`
-- Comments with `// comment` or `# comment`
-- Lexer errors for unknown characters
-- Parser errors that report the expected token and source position
+# Core Components
 
-## Example
+### Lexer
+Converts raw source code into tokens such as identifiers, literals, operators, and keywords.
+
+### Recursive Descent Parser
+Builds an Abstract Syntax Tree (AST) with proper operator precedence and expression handling.
+
+### Bytecode Compiler
+Transforms AST nodes into low-level VM instructions.
+
+Example:
 
 ```text
-// Recursive factorial
-flag = true
-print(flag)
-print(-5)
-print(5 != 4)
-
-fact(5)
-
-func fact(n) {
-    if n == 0 {
-        return 1
-    }
-    else {
-        return n * fact(n - 1)
-    }
-}
+PUSH 10
+PUSH 20
+ADD
+STORE x
 ```
 
-Expected final result:
+### Stack-Based Virtual Machine
+Executes bytecode using a runtime operand stack, instruction pointer, and call-frame system.
+
+Supports:
+
+- Arithmetic Expressions
+- Variables & Assignment
+- Comparisons
+- Conditional Execution
+- While Loops
+- Functions
+- Recursion
+- Local & Global Scope Management
+
+---
+
+# VM Architecture
+
+The VM uses:
+
+- Stack-based execution
+- Custom instruction set architecture (ISA)
+- Call frames for function execution
+- Runtime scope isolation
+- Bytecode dispatch loop
+
+Example instructions:
 
 ```text
-Result = 120
+PUSH
+LOAD
+STORE
+ADD
+SUB
+MUL
+DIV
+JMP
+CALL
+RETURN
 ```
 
-## Build
+---
+
+# Build
 
 ```bash
-g++ -std=c++17 main.cpp lexer.cpp parser.cpp compiler.cpp vm.cpp -o interpreter
+g++ main.cpp lexer.cpp parser.cpp compiler.cpp vm.cpp -o vm
 ```
 
-## Run
+Run:
 
 ```bash
-./interpreter
+./vm
 ```
 
-This starts the interactive REPL. `--repl` is also accepted:
+---
 
-```bash
-./interpreter --repl
-```
+# Technical Highlights
 
-Example session:
+- Recursive Descent Parsing
+- AST Generation
+- Bytecode Compilation
+- Stack Machine Design
+- Runtime Frame Management
+- Instruction Dispatching
+- Scope Resolution
+- Function Execution Model
 
-```text
->>> x = 10
-=> 10
->>> print(x >= 10)
-1
-=> 1
->>> func double(n) {
-... return n * 2
-... }
-=> 0
->>> double(21)
-=> 42
->>> exit
-```
+---
 
-The REPL keeps variables and function definitions available across inputs.
+# Future Work
 
-Invalid input reports a clear lexer or parser error:
+- Garbage Collection
+- Heap Objects
+- Closures
+- Classes & Objects
+- Bytecode Optimizations
+- REPL & Debugger
 
-```text
->>> print($)
-Error: Lexer error at line 1, column 7: unknown character '$'
->>> print(1
-Error: Parser error at line 2, column 1: expected ')' after print expression, found end of input
-```
+---
 
-## Project Structure
+# Inspiration
 
-- `lexer.*`: converts source text into tokens
-- `parser.*`: converts tokens into AST nodes
-- `ast.h`: AST node definitions
-- `compiler.*`: converts AST nodes into bytecode instructions
-- `opcode.h`: VM opcode list
-- `instruction.h`: bytecode instruction representation
-- `codeobject.h`: compiled code container
-- `frame.h`: VM call frame representation
-- `vm.*`: stack-based bytecode VM
-- `main.cpp`: REPL entry point
+Inspired by:
 
-## Good Next Improvements
+- CPython VM
+- Lua VM
+- JVM
+- Crafting Interpreters
 
-- Add file input, for example `./interpreter examples/factorial.bvm`
-- Add parser/runtime error messages with line and column numbers
-- Add tests for language behavior
-- Replace raw AST pointers with `std::unique_ptr`
-- Add a bytecode disassembler for debugging compiled instructions
+- # References & Inspiration
+
+This project was heavily inspired by:
+
+- "A Python Interpreter Written in Python" from *The Architecture of Open Source Applications (AOSA)*
+- Crafting Interpreters by Robert Nystrom
+- CPython and Lua VM internals
+
+AOSA Reference:
+https://aosabook.org/en/500L/a-python-interpreter-written-in-python.html
+
+The project extends those concepts further by implementing a custom bytecode compiler and stack-based virtual machine in C++.
