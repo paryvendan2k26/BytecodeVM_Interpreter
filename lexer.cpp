@@ -1,5 +1,7 @@
 #include "lexer.h"
 #include <cctype>
+#include <stdexcept>
+#include <string>
 
 using namespace std;
 
@@ -8,6 +10,8 @@ Lexer::Lexer(string input) {
     text = input;
 
     pos = 0;
+    line = 1;
+    column = 1;
 
     if (text.empty()) {
 
@@ -22,6 +26,17 @@ Lexer::Lexer(string input) {
 
 void Lexer::advance() {
 
+    if (currentChar == '\n') {
+
+        line++;
+        column = 1;
+    }
+
+    else {
+
+        column++;
+    }
+
     pos++;
 
     if (pos >= text.size()) {
@@ -35,6 +50,20 @@ void Lexer::advance() {
     }
 }
 
+Token Lexer::makeToken(
+    TokenType type,
+    string value,
+    int tokenColumn
+) {
+
+    return Token(
+        type,
+        value,
+        line,
+        tokenColumn
+    );
+}
+
 vector<Token> Lexer::tokenize() {
 
     vector<Token> tokens;
@@ -44,6 +73,7 @@ vector<Token> Lexer::tokenize() {
         if (isdigit(currentChar)) {
 
             string number = "";
+            int tokenColumn = column;
 
             while (isdigit(currentChar)) {
 
@@ -53,7 +83,11 @@ vector<Token> Lexer::tokenize() {
             }
 
             tokens.push_back(
-                Token(NUMBER, number)
+                makeToken(
+                    NUMBER,
+                    number,
+                    tokenColumn
+                )
             );
         }
 
@@ -62,80 +96,83 @@ vector<Token> Lexer::tokenize() {
             currentChar == '_'
         ) {
 
+            int tokenColumn = column;
             string name = identifier();
 
             if (name == "if") {
 
                 tokens.push_back(
-                    Token(IF, "if")
+                    makeToken(IF, "if", tokenColumn)
                 );
             }
 
             else if (name == "else") {
 
                 tokens.push_back(
-                    Token(ELSE, "else")
+                    makeToken(ELSE, "else", tokenColumn)
                 );
             }
 
             else if (name == "while") {
 
                 tokens.push_back(
-                    Token(WHILE, "while")
+                    makeToken(WHILE, "while", tokenColumn)
                 );
             }
 
             else if (name == "func") {
 
                 tokens.push_back(
-                    Token(FUNC, "func")
+                    makeToken(FUNC, "func", tokenColumn)
                 );
             }
 
             else if (name == "return") {
 
                 tokens.push_back(
-                    Token(RETURN, "return")
+                    makeToken(RETURN, "return", tokenColumn)
                 );
             }
 
             else if (name == "print") {
 
                 tokens.push_back(
-                    Token(PRINT, "print")
+                    makeToken(PRINT, "print", tokenColumn)
                 );
             }
 
             else if (name == "true") {
 
                 tokens.push_back(
-                    Token(TRUE, "true")
+                    makeToken(TRUE, "true", tokenColumn)
                 );
             }
 
             else if (name == "false") {
 
                 tokens.push_back(
-                    Token(FALSE, "false")
+                    makeToken(FALSE, "false", tokenColumn)
                 );
             }
 
             else {
 
                 tokens.push_back(
-                    Token(IDENTIFIER, name)
+                    makeToken(IDENTIFIER, name, tokenColumn)
                 );
             }
         }
 
         else if (currentChar == '=') {
 
+            int tokenColumn = column;
+
             advance();
 
             if (currentChar == '=') {
 
                 tokens.push_back(
-                    Token(EQUAL_EQUAL, "==")
+                    makeToken(EQUAL_EQUAL, "==", tokenColumn)
                 );
 
                 advance();
@@ -144,29 +181,42 @@ vector<Token> Lexer::tokenize() {
             else {
 
                 tokens.push_back(
-                    Token(EQUAL, "=")
+                    makeToken(EQUAL, "=", tokenColumn)
                 );
             }
         }
 
         else if (currentChar == '!') {
 
+            int tokenColumn = column;
+
             advance();
 
             if (currentChar == '=') {
 
                 tokens.push_back(
-                    Token(BANG_EQUAL, "!=")
+                    makeToken(BANG_EQUAL, "!=", tokenColumn)
                 );
 
                 advance();
+            }
+
+            else {
+
+                throw runtime_error(
+                    "Lexer error at line " +
+                    to_string(line) +
+                    ", column " +
+                    to_string(tokenColumn) +
+                    ": unexpected character '!'"
+                );
             }
         }
 
         else if (currentChar == '+') {
 
             tokens.push_back(
-                Token(PLUS, "+")
+                makeToken(PLUS, "+", column)
             );
 
             advance();
@@ -175,7 +225,7 @@ vector<Token> Lexer::tokenize() {
         else if (currentChar == '-') {
 
             tokens.push_back(
-                Token(MINUS, "-")
+                makeToken(MINUS, "-", column)
             );
 
             advance();
@@ -184,13 +234,15 @@ vector<Token> Lexer::tokenize() {
         else if (currentChar == '*') {
 
             tokens.push_back(
-                Token(STAR, "*")
+                makeToken(STAR, "*", column)
             );
 
             advance();
         }
 
         else if (currentChar == '/') {
+
+            int tokenColumn = column;
 
             advance();
 
@@ -208,7 +260,7 @@ vector<Token> Lexer::tokenize() {
             else {
 
                 tokens.push_back(
-                    Token(SLASH, "/")
+                    makeToken(SLASH, "/", tokenColumn)
                 );
             }
         }
@@ -227,7 +279,7 @@ vector<Token> Lexer::tokenize() {
         else if (currentChar == '(') {
 
             tokens.push_back(
-                Token(LPAREN, "(")
+                makeToken(LPAREN, "(", column)
             );
 
             advance();
@@ -236,7 +288,7 @@ vector<Token> Lexer::tokenize() {
         else if (currentChar == ')') {
 
             tokens.push_back(
-                Token(RPAREN, ")")
+                makeToken(RPAREN, ")", column)
             );
 
             advance();
@@ -245,7 +297,7 @@ vector<Token> Lexer::tokenize() {
         else if (currentChar == '{') {
 
             tokens.push_back(
-                Token(LBRACE, "{")
+                makeToken(LBRACE, "{", column)
             );
 
             advance();
@@ -254,7 +306,7 @@ vector<Token> Lexer::tokenize() {
         else if (currentChar == '}') {
 
             tokens.push_back(
-                Token(RBRACE, "}")
+                makeToken(RBRACE, "}", column)
             );
 
             advance();
@@ -262,12 +314,14 @@ vector<Token> Lexer::tokenize() {
 
         else if (currentChar == '>') {
 
+            int tokenColumn = column;
+
             advance();
 
             if (currentChar == '=') {
 
                 tokens.push_back(
-                    Token(GREATER_EQUAL, ">=")
+                    makeToken(GREATER_EQUAL, ">=", tokenColumn)
                 );
 
                 advance();
@@ -276,19 +330,21 @@ vector<Token> Lexer::tokenize() {
             else {
 
             tokens.push_back(
-                Token(GREATER, ">")
+                makeToken(GREATER, ">", tokenColumn)
             );
             }
         }
 
         else if (currentChar == '<') {
 
+            int tokenColumn = column;
+
             advance();
 
             if (currentChar == '=') {
 
                 tokens.push_back(
-                    Token(LESS_EQUAL, "<=")
+                    makeToken(LESS_EQUAL, "<=", tokenColumn)
                 );
 
                 advance();
@@ -297,7 +353,7 @@ vector<Token> Lexer::tokenize() {
             else {
 
             tokens.push_back(
-                Token(LESS, "<")
+                makeToken(LESS, "<", tokenColumn)
             );
             }
         }
@@ -305,20 +361,36 @@ vector<Token> Lexer::tokenize() {
         else if (currentChar == ',') {
 
             tokens.push_back(
-                Token(COMMA, ",")
+                makeToken(COMMA, ",", column)
             );
+
+            advance();
+        }
+
+        else if (isspace(currentChar)) {
 
             advance();
         }
 
         else {
 
-            advance();
+            char unexpected = currentChar;
+            int tokenColumn = column;
+
+            throw runtime_error(
+                "Lexer error at line " +
+                to_string(line) +
+                ", column " +
+                to_string(tokenColumn) +
+                ": unknown character '" +
+                string(1, unexpected) +
+                "'"
+            );
         }
     }
 
     tokens.push_back(
-        Token(EOF_TOKEN, "")
+        makeToken(EOF_TOKEN, "", column)
     );
 
     return tokens;

@@ -24,6 +24,8 @@ functions, recursion, and basic output.
 - Explicit returns with `return expr`
 - Console output with `print(expr)`
 - Comments with `// comment` or `# comment`
+- Lexer errors for unknown characters
+- Parser errors that report the expected token and source position
 
 ## Example
 
@@ -92,6 +94,15 @@ Example session:
 ```
 
 The REPL keeps variables and function definitions available across inputs.
+
+Invalid input reports a clear lexer or parser error:
+
+```text
+>>> print($)
+Error: Lexer error at line 1, column 7: unknown character '$'
+>>> print(1
+Error: Parser error at line 2, column 1: expected ')' after print expression, found end of input
+```
 
 ## Project Structure
 

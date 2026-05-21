@@ -20,6 +20,17 @@ public:
 
     void advance();
 
+    bool check(TokenType type);
+
+    Token expect(
+        TokenType type,
+        string expected
+    );
+
+    string tokenName(TokenType type);
+
+    void parserError(string expected);
+
     AST* parse();
 
     AST* expr();

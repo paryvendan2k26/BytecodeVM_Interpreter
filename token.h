@@ -47,13 +47,31 @@ public:
 
     TokenType type;
     string value;
+    int line;
+    int column;
 
     Token() {
+        line = 1;
+        column = 1;
     }
 
     Token(TokenType t, string v) {
         type = t;
         value = v;
+        line = 1;
+        column = 1;
+    }
+
+    Token(
+        TokenType t,
+        string v,
+        int tokenLine,
+        int tokenColumn
+    ) {
+        type = t;
+        value = v;
+        line = tokenLine;
+        column = tokenColumn;
     }
 
     string identifier();

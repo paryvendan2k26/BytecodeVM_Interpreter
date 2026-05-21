@@ -1,5 +1,7 @@
 #include "parser.h"
 
+#include <stdexcept>
+
 using namespace std;
 
 Parser::Parser(vector<Token> t) {
@@ -19,6 +21,86 @@ void Parser::advance() {
 
         currentToken = tokens[pos];
     }
+}
+
+bool Parser::check(TokenType type) {
+
+    return currentToken.type == type;
+}
+
+string Parser::tokenName(TokenType type) {
+
+    switch (type) {
+
+        case NUMBER: return "number";
+        case IDENTIFIER: return "identifier";
+        case PLUS: return "+";
+        case MINUS: return "-";
+        case STAR: return "*";
+        case SLASH: return "/";
+        case EQUAL: return "=";
+        case EQUAL_EQUAL: return "==";
+        case BANG_EQUAL: return "!=";
+        case GREATER: return ">";
+        case GREATER_EQUAL: return ">=";
+        case LESS: return "<";
+        case LESS_EQUAL: return "<=";
+        case LPAREN: return "(";
+        case RPAREN: return ")";
+        case LBRACE: return "{";
+        case RBRACE: return "}";
+        case IF: return "if";
+        case ELSE: return "else";
+        case WHILE: return "while";
+        case FUNC: return "func";
+        case RETURN: return "return";
+        case PRINT: return "print";
+        case TRUE: return "true";
+        case FALSE: return "false";
+        case COMMA: return ",";
+        case EOF_TOKEN: return "end of input";
+    }
+
+    return "token";
+}
+
+void Parser::parserError(string expected) {
+
+    string found =
+        tokenName(currentToken.type);
+
+    if (!currentToken.value.empty()) {
+
+        found += " '" + currentToken.value + "'";
+    }
+
+    throw runtime_error(
+        "Parser error at line " +
+        to_string(currentToken.line) +
+        ", column " +
+        to_string(currentToken.column) +
+        ": expected " +
+        expected +
+        ", found " +
+        found
+    );
+}
+
+Token Parser::expect(
+    TokenType type,
+    string expected
+) {
+
+    if (!check(type)) {
+
+        parserError(expected);
+    }
+
+    Token token = currentToken;
+
+    advance();
+
+    return token;
 }
 
 AST* Parser::factor() {
@@ -77,13 +159,14 @@ AST* Parser::factor() {
 
         AST* node = comparison();
 
-        if (currentToken.type == RPAREN) {
-
-            advance();
-        }
+        expect(RPAREN, "')'");
 
         return node;
     }
+
+    parserError(
+        "expression"
+    );
 
     return nullptr;
 }
@@ -192,19 +275,13 @@ AST* Parser::ifStatement() {
     AST* condition =
         comparison();
 
-    if (
-        currentToken.type ==
-        LBRACE
-    ) {
-
-        advance();
-    }
+    expect(LBRACE, "'{' after if condition");
 
     vector<AST*> ifBody;
 
     while (
-        currentToken.type !=
-        RBRACE
+        currentToken.type != RBRACE &&
+        currentToken.type != EOF_TOKEN
     ) {
 
         ifBody.push_back(
@@ -212,7 +289,7 @@ AST* Parser::ifStatement() {
         );
     }
 
-    advance();
+    expect(RBRACE, "'}' after if body");
 
     vector<AST*> elseBody;
 
@@ -223,17 +300,11 @@ AST* Parser::ifStatement() {
 
         advance();
 
-        if (
-            currentToken.type ==
-            LBRACE
-        ) {
-
-            advance();
-        }
+        expect(LBRACE, "'{' after else");
 
         while (
-            currentToken.type !=
-            RBRACE
+            currentToken.type != RBRACE &&
+            currentToken.type != EOF_TOKEN
         ) {
 
             elseBody.push_back(
@@ -241,7 +312,7 @@ AST* Parser::ifStatement() {
             );
         }
 
-        advance();
+        expect(RBRACE, "'}' after else body");
     }
 
     return new IfNode(
@@ -304,15 +375,13 @@ AST* Parser::whileStatement() {
     AST* condition =
         comparison();
 
-    if (currentToken.type == LBRACE) {
-
-        advance();
-    }
+    expect(LBRACE, "'{' after while condition");
 
     vector<AST*> body;
 
     while (
-        currentToken.type != RBRACE
+        currentToken.type != RBRACE &&
+        currentToken.type != EOF_TOKEN
     ) {
 
         body.push_back(
@@ -320,7 +389,7 @@ AST* Parser::whileStatement() {
         );
     }
 
-    advance();
+    expect(RBRACE, "'}' after while body");
 
     return new WhileNode(
         condition,
@@ -348,12 +417,13 @@ AST* Parser::functionDefinition() {
 
     advance();
 
+    Token nameToken =
+        expect(IDENTIFIER, "function name");
+
     string name =
-        currentToken.value;
+        nameToken.value;
 
-    advance();
-
-    advance();
+    expect(LPAREN, "'(' after function name");
 
     vector<string> params;
 
@@ -361,11 +431,12 @@ AST* Parser::functionDefinition() {
         currentToken.type != RPAREN
     ) {
 
-        params.push_back(
-            currentToken.value
-        );
+        Token paramToken =
+            expect(IDENTIFIER, "parameter name");
 
-        advance();
+        params.push_back(
+            paramToken.value
+        );
 
         if (
             currentToken.type == COMMA
@@ -373,21 +444,24 @@ AST* Parser::functionDefinition() {
 
             advance();
         }
+
+        else if (
+            currentToken.type != RPAREN
+        ) {
+
+            parserError("',' or ')' after parameter");
+        }
     }
 
-    advance();
+    expect(RPAREN, "')' after function parameters");
 
-    if (
-        currentToken.type == LBRACE
-    ) {
-
-        advance();
-    }
+    expect(LBRACE, "'{' before function body");
 
     vector<AST*> body;
 
     while (
-        currentToken.type != RBRACE
+        currentToken.type != RBRACE &&
+        currentToken.type != EOF_TOKEN
     ) {
 
         body.push_back(
@@ -395,7 +469,7 @@ AST* Parser::functionDefinition() {
         );
     }
 
-    advance();
+    expect(RBRACE, "'}' after function body");
 
     return new FunctionDefNode(
         name,
@@ -411,7 +485,7 @@ AST* Parser::functionCall() {
 
     advance();
 
-    advance();
+    expect(LPAREN, "'(' after function name");
 
     vector<AST*> args;
 
@@ -429,9 +503,16 @@ AST* Parser::functionCall() {
 
             advance();
         }
+
+        else if (
+            currentToken.type != RPAREN
+        ) {
+
+            parserError("',' or ')' after argument");
+        }
     }
 
-    advance();
+    expect(RPAREN, "')' after function arguments");
 
     return new FunctionCallNode(
         name,
@@ -443,6 +524,14 @@ AST* Parser::returnStatement() {
 
     advance();
 
+    if (
+        currentToken.type == RBRACE ||
+        currentToken.type == EOF_TOKEN
+    ) {
+
+        parserError("expression after return");
+    }
+
     AST* value =
         comparison();
 
@@ -453,18 +542,12 @@ AST* Parser::printStatement() {
 
     advance();
 
-    if (currentToken.type == LPAREN) {
-
-        advance();
-    }
+    expect(LPAREN, "'(' after print");
 
     AST* value =
         comparison();
 
-    if (currentToken.type == RPAREN) {
-
-        advance();
-    }
+    expect(RPAREN, "')' after print expression");
 
     return new PrintNode(value);
 }
