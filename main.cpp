@@ -124,49 +124,20 @@ int main(
     char* argv[]
 ) {
 
-if (
-    argc > 1 &&
-    string(argv[1]) == "--repl"
-) {
+    if (
+        argc > 1 &&
+        string(argv[1]) != "--repl"
+    ) {
+
+        cout << "Usage: "
+             << argv[0]
+             << " [--repl]"
+             << endl;
+
+        return 1;
+    }
 
     runRepl();
-
-    return 0;
-}
-
-string input = 
-
-"// Recursive factorial demo with explicit return and print.\n"
-"flag = true\n"
-"print(flag)\n"
-"print(-5)\n"
-"print(5 != 4)\n"
-"print(5 >= 5)\n"
-"print(3 <= 4)\n"
-"fact(5)\n"
-
-"func fact(n) {\n"
-
-"if n == 0 {\n"
-"return 1\n"
-"}\n"
-
-"else {\n"
-"return n * fact(n - 1)\n"
-"}\n"
-
-"}";
-    VM vm;
-
-    int result = executeSource(
-        input,
-        vm,
-        true
-    );
-
-    cout << "Result = "
-         << result
-         << endl;
 
     return 0;
 }

@@ -66,11 +66,7 @@ g++ -std=c++17 main.cpp lexer.cpp parser.cpp compiler.cpp vm.cpp -o interpreter
 ./interpreter
 ```
 
-The current entry point uses a hardcoded demo program in `main.cpp`.
-
-## REPL
-
-Start the interactive prompt with:
+This starts the interactive REPL. `--repl` is also accepted:
 
 ```bash
 ./interpreter --repl
@@ -115,12 +111,11 @@ Error: Parser error at line 2, column 1: expected ')' after print expression, fo
 - `codeobject.h`: compiled code container
 - `frame.h`: VM call frame representation
 - `vm.*`: stack-based bytecode VM
-- `main.cpp`: demo program entry point
+- `main.cpp`: REPL entry point
 
 ## Good Next Improvements
 
 - Add file input, for example `./interpreter examples/factorial.bvm`
-- Add a REPL mode
 - Add parser/runtime error messages with line and column numbers
 - Add tests for language behavior
 - Replace raw AST pointers with `std::unique_ptr`
