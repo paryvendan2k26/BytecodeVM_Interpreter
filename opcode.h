@@ -14,8 +14,14 @@ enum OpCode {
     OP_DIV,
 
     OP_COMPARE_GT,
+    OP_COMPARE_GE,
     OP_COMPARE_LT,
+    OP_COMPARE_LE,
     OP_COMPARE_EQ,
+    OP_COMPARE_NE,
+
+    OP_NEGATE,
+    OP_PRINT,
 
     OP_JUMP_IF_FALSE,
     OP_JUMP,

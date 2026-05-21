@@ -1,0 +1,1272 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>AST and Parser Deep Dive - BytecodeVM Interpreter</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 18mm 16mm;
+    }
+    body {
+      font-family: "Liberation Serif", Georgia, serif;
+      color: #1f2933;
+      line-height: 1.48;
+      font-size: 11.5pt;
+    }
+    h1, h2, h3, h4 {
+      font-family: "Liberation Sans", Arial, sans-serif;
+      color: #102a43;
+      page-break-after: avoid;
+    }
+    h1 {
+      font-size: 25pt;
+      margin-top: 0;
+      border-bottom: 2px solid #486581;
+      padding-bottom: 8px;
+    }
+    h2 {
+      font-size: 18pt;
+      margin-top: 26px;
+      border-bottom: 1px solid #bcccdc;
+      padding-bottom: 4px;
+    }
+    h3 {
+      font-size: 14pt;
+      margin-top: 18px;
+    }
+    h4 {
+      font-size: 12pt;
+      margin-top: 12px;
+    }
+    code, pre {
+      font-family: "Liberation Mono", Consolas, monospace;
+    }
+    pre {
+      background: #f0f4f8;
+      border: 1px solid #d9e2ec;
+      border-radius: 5px;
+      padding: 10px;
+      white-space: pre-wrap;
+      page-break-inside: avoid;
+      font-size: 9.2pt;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 10px 0 16px;
+      page-break-inside: avoid;
+    }
+    th, td {
+      border: 1px solid #bcccdc;
+      padding: 6px 8px;
+      vertical-align: top;
+    }
+    th {
+      background: #d9e2ec;
+      font-family: "Liberation Sans", Arial, sans-serif;
+      text-align: left;
+    }
+    .subtitle {
+      font-family: "Liberation Sans", Arial, sans-serif;
+      color: #52606d;
+      font-size: 13pt;
+      margin-bottom: 28px;
+    }
+    .callout {
+      border-left: 4px solid #486581;
+      background: #f0f4f8;
+      padding: 8px 12px;
+      margin: 12px 0;
+    }
+    .warning {
+      border-left: 4px solid #b44d12;
+      background: #fff4e6;
+      padding: 8px 12px;
+      margin: 12px 0;
+    }
+  </style>
+</head>
+<body>
+
+<h1>AST and Parser Deep Dive</h1>
+<div class="subtitle">
+  Project: <code>/home/adminn/BytecodeVM_Interpreter</code><br>
+  Focus: Parser concepts, AST concepts, project implementation, examples, and dry runs<br>
+  Date: 2026-05-17
+</div>
+
+<h2>1. Where Parser And AST Fit In The Interpreter</h2>
+
+<p>
+  Your project executes a small programming language. The parser and AST sit in the middle of the language pipeline.
+  They are the bridge between simple tokens and executable bytecode.
+</p>
+
+<pre>Source Code
+   |
+   v
+Lexer
+   |
+   v
+Tokens
+   |
+   v
+Parser
+   |
+   v
+AST
+   |
+   v
+Compiler
+   |
+   v
+Bytecode
+   |
+   v
+Virtual Machine</pre>
+
+<p>
+  The lexer only understands small pieces: numbers, names, operators, braces, and keywords. The parser understands structure.
+  It answers questions like:
+</p>
+
+<ul>
+  <li>Is this token sequence an assignment?</li>
+  <li>Is this expression an addition or multiplication?</li>
+  <li>Does this <code>if</code> have an <code>else</code>?</li>
+  <li>Where does a function body start and end?</li>
+  <li>Which operation should happen first?</li>
+</ul>
+
+<p>
+  The AST is the parser's output. It is a tree-shaped representation of the program's meaning.
+  Instead of keeping the source as text, the project stores it as objects like <code>BinaryOpNode</code>, <code>IfNode</code>,
+  <code>WhileNode</code>, and <code>FunctionDefNode</code>.
+</p>
+
+<h2>2. What Is A Parser?</h2>
+
+<p>
+  A parser is a program that reads a sequence of tokens and checks whether they form a valid structure according to a grammar.
+  If the structure is valid, the parser builds a useful representation of that structure. In this project, that representation is an AST.
+</p>
+
+<p>
+  Example source:
+</p>
+
+<pre>x = 2 + 3 * 4</pre>
+
+<p>
+  The lexer produces tokens:
+</p>
+
+<pre>IDENTIFIER("x")
+EQUAL("=")
+NUMBER("2")
+PLUS("+")
+NUMBER("3")
+STAR("*")
+NUMBER("4")
+EOF_TOKEN("")</pre>
+
+<p>
+  The parser must understand that this is not just a flat list. It is an assignment where the right-hand side is an arithmetic expression.
+  It must also understand that multiplication has higher precedence than addition.
+</p>
+
+<pre>AssignNode("x")
+└── BinaryOpNode("+")
+    ├── NumberNode("2")
+    └── BinaryOpNode("*")
+        ├── NumberNode("3")
+        └── NumberNode("4")</pre>
+
+<h2>3. What Is An AST?</h2>
+
+<p>
+  AST means <strong>Abstract Syntax Tree</strong>. It is a tree representation of source code.
+  The word "syntax" means structure. The word "abstract" means it removes unnecessary surface details.
+</p>
+
+<p>
+  For example, the source has exact characters, spacing, and punctuation:
+</p>
+
+<pre>(2 + 3) * 4</pre>
+
+<p>
+  The AST does not care about the spaces. It also does not usually store parentheses as real nodes.
+  Parentheses only influence the final tree shape:
+</p>
+
+<pre>BinaryOpNode("*")
+├── BinaryOpNode("+")
+│   ├── NumberNode("2")
+│   └── NumberNode("3")
+└── NumberNode("4")</pre>
+
+<p>
+  This tree says: first compute <code>2 + 3</code>, then multiply the result by <code>4</code>.
+</p>
+
+<div class="callout">
+  <strong>Key idea:</strong> source code is written for humans, but an AST is structured for the compiler.
+</div>
+
+<h2>4. Concrete Syntax Tree vs Abstract Syntax Tree</h2>
+
+<p>
+  A complete parse tree, sometimes called a concrete syntax tree, includes every grammar detail. It may include parentheses,
+  punctuation, and intermediate grammar rules. An AST is cleaner. It keeps only the meaningful program structure.
+</p>
+
+<table>
+  <tr>
+    <th>Concrete Syntax Tree</th>
+    <th>Abstract Syntax Tree</th>
+  </tr>
+  <tr>
+    <td>Contains all syntax details.</td>
+    <td>Contains semantic structure.</td>
+  </tr>
+  <tr>
+    <td>Can include parentheses, commas, grammar helper nodes.</td>
+    <td>Usually removes punctuation and helper nodes.</td>
+  </tr>
+  <tr>
+    <td>Useful for exact syntax analysis.</td>
+    <td>Useful for compilation and execution.</td>
+  </tr>
+  <tr>
+    <td>Closer to source text.</td>
+    <td>Closer to program meaning.</td>
+  </tr>
+</table>
+
+<h2>5. AST Classes In Your Project</h2>
+
+<p>
+  Your AST classes are declared in <code>ast.h</code>. All node classes inherit from the base class <code>AST</code>.
+  The compiler later uses <code>dynamic_cast</code> to check which exact node type it is compiling.
+</p>
+
+<h3>5.1 Base AST Class</h3>
+
+<pre>class AST {
+public:
+    virtual ~AST() {}
+};</pre>
+
+<p>
+  This base class makes all AST node types part of the same family. The virtual destructor also makes <code>dynamic_cast</code>
+  work because the class becomes polymorphic.
+</p>
+
+<h3>5.2 NumberNode</h3>
+
+<pre>class NumberNode : public AST {
+public:
+    string value;
+
+    NumberNode(string val) {
+        value = val;
+    }
+};</pre>
+
+<p>
+  Represents integer literals such as <code>5</code>, <code>100</code>, or <code>42</code>.
+  It stores the number as a string because token values are strings. The VM later converts constants using <code>stoi</code>.
+</p>
+
+<h3>5.3 BinaryOpNode</h3>
+
+<pre>class BinaryOpNode : public AST {
+public:
+    AST* left;
+    string op;
+    AST* right;
+};</pre>
+
+<p>
+  Represents arithmetic operations such as <code>2 + 3</code>, <code>x - 1</code>, or <code>n * fact(n - 1)</code>.
+</p>
+
+<pre>BinaryOpNode("*")
+├── VariableNode("n")
+└── FunctionCallNode("fact")
+    └── BinaryOpNode("-")
+        ├── VariableNode("n")
+        └── NumberNode("1")</pre>
+
+<h3>5.4 VariableNode</h3>
+
+<pre>class VariableNode : public AST {
+public:
+    string name;
+};</pre>
+
+<p>
+  Represents reading a variable. For example, in <code>x + 1</code>, <code>x</code> becomes a <code>VariableNode</code>.
+  The compiler turns it into <code>OP_LOAD_NAME x</code>.
+</p>
+
+<h3>5.5 AssignNode</h3>
+
+<pre>class AssignNode : public AST {
+public:
+    string name;
+    AST* value;
+};</pre>
+
+<p>
+  Represents assigning to a variable. In <code>x = 2 + 3</code>, the node stores <code>name = "x"</code>
+  and the value is a subtree for <code>2 + 3</code>.
+</p>
+
+<h3>5.6 ProgramNode</h3>
+
+<pre>class ProgramNode : public AST {
+public:
+    vector&lt;AST*&gt; statements;
+};</pre>
+
+<p>
+  Represents the entire program. It contains all top-level statements in source order.
+</p>
+
+<pre>ProgramNode
+├── FunctionCallNode("fact")
+└── FunctionDefNode("fact")</pre>
+
+<h3>5.7 IfNode</h3>
+
+<pre>class IfNode : public AST {
+public:
+    AST* condition;
+    vector&lt;AST*&gt; ifBody;
+    vector&lt;AST*&gt; elseBody;
+};</pre>
+
+<p>
+  Represents an <code>if</code> statement. The condition is an expression tree. The if body and else body are lists of statements.
+</p>
+
+<h3>5.8 CompareNode</h3>
+
+<pre>class CompareNode : public AST {
+public:
+    AST* left;
+    string op;
+    AST* right;
+};</pre>
+
+<p>
+  Represents comparisons such as <code>n == 0</code>, <code>i &lt; 5</code>, or <code>x &gt; y</code>.
+  Comparisons produce integer boolean values in the VM: <code>1</code> for true and <code>0</code> for false.
+</p>
+
+<h3>5.9 WhileNode</h3>
+
+<pre>class WhileNode : public AST {
+public:
+    AST* condition;
+    vector&lt;AST*&gt; body;
+};</pre>
+
+<p>
+  Represents a while loop. The parser stores the loop condition separately from the body statements.
+</p>
+
+<h3>5.10 FunctionDefNode</h3>
+
+<pre>class FunctionDefNode : public AST {
+public:
+    string name;
+    vector&lt;string&gt; params;
+    vector&lt;AST*&gt; body;
+};</pre>
+
+<p>
+  Represents a function definition such as:
+</p>
+
+<pre>func fact(n) {
+    ...
+}</pre>
+
+<p>
+  It stores the function name, parameter names, and body statements.
+</p>
+
+<h3>5.11 FunctionCallNode</h3>
+
+<pre>class FunctionCallNode : public AST {
+public:
+    string name;
+    vector&lt;AST*&gt; args;
+};</pre>
+
+<p>
+  Represents a function call such as <code>fact(5)</code> or <code>add(x, y)</code>.
+  Each argument is itself an AST expression.
+</p>
+
+<h2>6. Parser Type Used: Recursive Descent Parser</h2>
+
+<p>
+  Your project uses a <strong>recursive descent parser</strong>. This means the grammar is implemented as a group of functions,
+  where each function parses one kind of language construct.
+</p>
+
+<p>
+  For example:
+</p>
+
+<ul>
+  <li><code>program()</code> parses the whole program.</li>
+  <li><code>statement()</code> parses one statement.</li>
+  <li><code>expr()</code> parses addition and subtraction.</li>
+  <li><code>term()</code> parses multiplication and division.</li>
+  <li><code>factor()</code> parses numbers, variables, function calls, and parentheses.</li>
+</ul>
+
+<p>
+  The name "recursive descent" comes from the fact that functions call other parser functions to descend into smaller pieces of syntax.
+  For example, <code>expr()</code> calls <code>term()</code>, and <code>term()</code> calls <code>factor()</code>.
+</p>
+
+<h2>7. Parser State In Your Project</h2>
+
+<pre>class Parser {
+public:
+    vector&lt;Token&gt; tokens;
+    int pos;
+    Token currentToken;
+
+    Parser(vector&lt;Token&gt; t);
+    void advance();
+    AST* parse();
+    AST* expr();
+    AST* term();
+    AST* factor();
+    AST* statement();
+    AST* program();
+    AST* ifStatement();
+    AST* comparison();
+    AST* whileStatement();
+    AST* functionDefinition();
+    AST* functionCall();
+};</pre>
+
+<table>
+  <tr>
+    <th>Field</th>
+    <th>Meaning</th>
+  </tr>
+  <tr>
+    <td><code>tokens</code></td>
+    <td>The full token list from the lexer.</td>
+  </tr>
+  <tr>
+    <td><code>pos</code></td>
+    <td>The current token index.</td>
+  </tr>
+  <tr>
+    <td><code>currentToken</code></td>
+    <td>The token currently being parsed.</td>
+  </tr>
+</table>
+
+<h3>7.1 Parser Constructor</h3>
+
+<pre>Parser::Parser(vector&lt;Token&gt; t) {
+    tokens = t;
+    pos = 0;
+    currentToken = tokens[pos];
+}</pre>
+
+<p>
+  The parser starts at token index zero. It assumes the token vector is not empty.
+  This is safe in normal flow because the lexer always appends <code>EOF_TOKEN</code>.
+</p>
+
+<h3>7.2 advance()</h3>
+
+<pre>void Parser::advance() {
+    pos++;
+
+    if (pos &lt; tokens.size()) {
+        currentToken = tokens[pos];
+    }
+}</pre>
+
+<p>
+  <code>advance()</code> consumes the current token and moves to the next one.
+  Parser code calls <code>advance()</code> after it has recognized a token.
+</p>
+
+<h2>8. Grammar Of Your Language</h2>
+
+<p>
+  A grammar describes how valid programs are built from tokens. Your parser implements this approximate grammar:
+</p>
+
+<pre>program        -> statement* EOF
+
+statement      -> functionDefinition
+                | ifStatement
+                | whileStatement
+                | assignment
+                | comparison
+
+assignment     -> IDENTIFIER "=" comparison
+
+comparison     -> expr (("&gt;" | "&lt;" | "==") expr)*
+
+expr           -> term (("+" | "-") term)*
+
+term           -> factor (("*" | "/") factor)*
+
+factor         -> NUMBER
+                | IDENTIFIER
+                | functionCall
+                | "(" comparison ")"
+
+ifStatement    -> "if" comparison "{" statement* "}"
+                  ("else" "{" statement* "}")?
+
+whileStatement -> "while" comparison "{" statement* "}"
+
+functionDefinition
+               -> "func" IDENTIFIER "(" params? ")" "{" statement* "}"
+
+functionCall   -> IDENTIFIER "(" args? ")"</pre>
+
+<p>
+  This grammar explains why the parser functions are structured as they are.
+</p>
+
+<h2>9. Operator Precedence Deep Dive</h2>
+
+<p>
+  Operator precedence decides which operation binds more tightly. In normal math, multiplication happens before addition:
+</p>
+
+<pre>2 + 3 * 4 = 14
+not 20</pre>
+
+<p>
+  Your parser enforces this using separate functions:
+</p>
+
+<table>
+  <tr>
+    <th>Parser Function</th>
+    <th>Handles</th>
+    <th>Precedence</th>
+  </tr>
+  <tr>
+    <td><code>factor()</code></td>
+    <td>Numbers, variables, function calls, parentheses</td>
+    <td>Highest</td>
+  </tr>
+  <tr>
+    <td><code>term()</code></td>
+    <td><code>*</code>, <code>/</code></td>
+    <td>High</td>
+  </tr>
+  <tr>
+    <td><code>expr()</code></td>
+    <td><code>+</code>, <code>-</code></td>
+    <td>Medium</td>
+  </tr>
+  <tr>
+    <td><code>comparison()</code></td>
+    <td><code>&gt;</code>, <code>&lt;</code>, <code>==</code></td>
+    <td>Low</td>
+  </tr>
+</table>
+
+<p>
+  The lower-precedence function calls the higher-precedence function first. For example, <code>expr()</code> starts by parsing a
+  <code>term()</code>. That means multiplication gets grouped before addition.
+</p>
+
+<h2>10. Deep Dive: factor()</h2>
+
+<p>
+  <code>factor()</code> parses the smallest meaningful expression units.
+</p>
+
+<p>It handles four cases:</p>
+
+<ul>
+  <li>A number, such as <code>123</code>.</li>
+  <li>An identifier, such as <code>x</code>.</li>
+  <li>A function call, such as <code>fact(5)</code>.</li>
+  <li>A parenthesized expression, such as <code>(2 + 3)</code>.</li>
+</ul>
+
+<p>
+  Important function-call detection:
+</p>
+
+<pre>if (currentToken.type == IDENTIFIER) {
+    if (tokens[pos + 1].type == LPAREN) {
+        return functionCall();
+    }
+
+    AST* node = new VariableNode(currentToken.value);
+    advance();
+    return node;
+}</pre>
+
+<p>
+  The parser looks one token ahead. If an identifier is followed by <code>(</code>, it is treated as a function call.
+  Otherwise, it is treated as a variable read.
+</p>
+
+<div class="warning">
+  <strong>Safety note:</strong> <code>tokens[pos + 1]</code> assumes there is another token available.
+  The lexer appends <code>EOF_TOKEN</code>, so valid input usually works, but production parsers should still bounds-check.
+</div>
+
+<h2>11. Deep Dive: term()</h2>
+
+<p>
+  <code>term()</code> handles multiplication and division.
+  It starts by parsing a <code>factor()</code>, then keeps consuming <code>*</code> or <code>/</code> operators.
+</p>
+
+<pre>AST* Parser::term() {
+    AST* node = factor();
+
+    while (
+        currentToken.type == STAR ||
+        currentToken.type == SLASH
+    ) {
+        string op = currentToken.value;
+        advance();
+        AST* right = factor();
+        node = new BinaryOpNode(node, op, right);
+    }
+
+    return node;
+}</pre>
+
+<h3>11.1 Example</h3>
+
+<pre>3 * 4 / 2</pre>
+
+<p>
+  The parser builds this left-associative tree:
+</p>
+
+<pre>BinaryOpNode("/")
+├── BinaryOpNode("*")
+│   ├── NumberNode("3")
+│   └── NumberNode("4")
+└── NumberNode("2")</pre>
+
+<p>
+  That means the expression is interpreted as:
+</p>
+
+<pre>(3 * 4) / 2</pre>
+
+<h2>12. Deep Dive: expr()</h2>
+
+<p>
+  <code>expr()</code> handles addition and subtraction.
+  It uses <code>term()</code> for operands, so multiplication and division are already grouped before addition and subtraction.
+</p>
+
+<pre>AST* Parser::expr() {
+    AST* node = term();
+
+    while (
+        currentToken.type == PLUS ||
+        currentToken.type == MINUS
+    ) {
+        string op = currentToken.value;
+        advance();
+        AST* right = term();
+        node = new BinaryOpNode(node, op, right);
+    }
+
+    return node;
+}</pre>
+
+<h3>12.1 Example</h3>
+
+<pre>2 + 3 * 4</pre>
+
+<p>
+  <code>expr()</code> first gets <code>2</code> from <code>term()</code>. Then it sees <code>+</code>.
+  For the right side, it calls <code>term()</code>, which consumes <code>3 * 4</code> as one subtree.
+</p>
+
+<pre>BinaryOpNode("+")
+├── NumberNode("2")
+└── BinaryOpNode("*")
+    ├── NumberNode("3")
+    └── NumberNode("4")</pre>
+
+<h2>13. Deep Dive: comparison()</h2>
+
+<p>
+  <code>comparison()</code> parses comparison operators: <code>&gt;</code>, <code>&lt;</code>, and <code>==</code>.
+  It calls <code>expr()</code> for both left and right operands.
+</p>
+
+<pre>AST* Parser::comparison() {
+    AST* node = expr();
+
+    while (
+        currentToken.type == GREATER ||
+        currentToken.type == LESS ||
+        currentToken.type == EQUAL_EQUAL
+    ) {
+        string op = currentToken.value;
+        advance();
+        AST* right = expr();
+        node = new CompareNode(node, op, right);
+    }
+
+    return node;
+}</pre>
+
+<h3>13.1 Example</h3>
+
+<pre>n == 0</pre>
+
+<p>AST:</p>
+
+<pre>CompareNode("==")
+├── VariableNode("n")
+└── NumberNode("0")</pre>
+
+<h2>14. Deep Dive: statement()</h2>
+
+<p>
+  <code>statement()</code> is the parser's dispatcher. It decides what kind of statement starts at the current token.
+</p>
+
+<pre>AST* Parser::statement() {
+    if (currentToken.type == FUNC) {
+        return functionDefinition();
+    }
+
+    if (currentToken.type == IF) {
+        return ifStatement();
+    }
+
+    if (currentToken.type == WHILE) {
+        return whileStatement();
+    }
+
+    if (
+        currentToken.type == IDENTIFIER &&
+        tokens[pos + 1].type == EQUAL
+    ) {
+        string name = currentToken.value;
+        advance();
+        advance();
+        AST* value = comparison();
+        return new AssignNode(name, value);
+    }
+
+    return comparison();
+}</pre>
+
+<p>
+  The order matters. If the current token is <code>FUNC</code>, the parser must not treat it as an expression.
+  If the current token is an identifier followed by <code>=</code>, it is an assignment.
+  Otherwise, the parser treats the statement as an expression.
+</p>
+
+<h2>15. Deep Dive: program()</h2>
+
+<p>
+  <code>program()</code> parses the whole file or source string.
+  It keeps reading statements until the lexer-provided <code>EOF_TOKEN</code>.
+</p>
+
+<pre>AST* Parser::program() {
+    vector&lt;AST*&gt; statements;
+
+    while (currentToken.type != EOF_TOKEN) {
+        statements.push_back(statement());
+    }
+
+    return new ProgramNode(statements);
+}</pre>
+
+<p>
+  The result is a <code>ProgramNode</code> containing all top-level statements.
+</p>
+
+<h2>16. Deep Dive: ifStatement()</h2>
+
+<p>
+  An <code>if</code> statement has a condition, an if-body, and optionally an else-body.
+</p>
+
+<pre>if x &gt; 5 {
+    x * 2
+}
+else {
+    x - 2
+}</pre>
+
+<p>AST shape:</p>
+
+<pre>IfNode
+├── condition:
+│   └── CompareNode("&gt;")
+│       ├── VariableNode("x")
+│       └── NumberNode("5")
+├── ifBody:
+│   └── BinaryOpNode("*")
+│       ├── VariableNode("x")
+│       └── NumberNode("2")
+└── elseBody:
+    └── BinaryOpNode("-")
+        ├── VariableNode("x")
+        └── NumberNode("2")</pre>
+
+<p>
+  The parser consumes <code>if</code>, parses the condition using <code>comparison()</code>, enters the brace block,
+  collects statements until <code>}</code>, then optionally parses the <code>else</code> block.
+</p>
+
+<h2>17. Deep Dive: whileStatement()</h2>
+
+<p>
+  A while loop has a condition and a body.
+</p>
+
+<pre>while i &lt; 5 {
+    i = i + 1
+}</pre>
+
+<p>AST shape:</p>
+
+<pre>WhileNode
+├── condition:
+│   └── CompareNode("&lt;")
+│       ├── VariableNode("i")
+│       └── NumberNode("5")
+└── body:
+    └── AssignNode("i")
+        └── BinaryOpNode("+")
+            ├── VariableNode("i")
+            └── NumberNode("1")</pre>
+
+<h2>18. Deep Dive: functionDefinition()</h2>
+
+<p>
+  Function definitions start with <code>func</code>, followed by a name, parameter list, and body.
+</p>
+
+<pre>func fact(n) {
+    if n == 0 {
+        1
+    }
+    else {
+        n * fact(n - 1)
+    }
+}</pre>
+
+<p>AST shape:</p>
+
+<pre>FunctionDefNode("fact")
+├── params:
+│   └── "n"
+└── body:
+    └── IfNode
+        ├── condition:
+        │   └── CompareNode("==")
+        │       ├── VariableNode("n")
+        │       └── NumberNode("0")
+        ├── ifBody:
+        │   └── NumberNode("1")
+        └── elseBody:
+            └── BinaryOpNode("*")
+                ├── VariableNode("n")
+                └── FunctionCallNode("fact")
+                    └── BinaryOpNode("-")
+                        ├── VariableNode("n")
+                        └── NumberNode("1")</pre>
+
+<h2>19. Deep Dive: functionCall()</h2>
+
+<p>
+  Function calls start with an identifier followed by parentheses.
+</p>
+
+<pre>fact(5)</pre>
+
+<p>AST:</p>
+
+<pre>FunctionCallNode("fact")
+└── args:
+    └── NumberNode("5")</pre>
+
+<p>
+  Function call arguments are parsed using <code>comparison()</code>. This means arguments can be full expressions:
+</p>
+
+<pre>fact(n - 1)</pre>
+
+<p>AST:</p>
+
+<pre>FunctionCallNode("fact")
+└── args:
+    └── BinaryOpNode("-")
+        ├── VariableNode("n")
+        └── NumberNode("1")</pre>
+
+<h2>20. Full Parser Walkthrough: <code>x = 2 + 3 * 4</code></h2>
+
+<h3>20.1 Tokens</h3>
+
+<pre>0: IDENTIFIER("x")
+1: EQUAL("=")
+2: NUMBER("2")
+3: PLUS("+")
+4: NUMBER("3")
+5: STAR("*")
+6: NUMBER("4")
+7: EOF_TOKEN("")</pre>
+
+<h3>20.2 Function Call Flow</h3>
+
+<pre>parse()
+└── program()
+    └── statement()
+        ├── sees IDENTIFIER followed by EQUAL
+        ├── consumes "x"
+        ├── consumes "="
+        └── comparison()
+            └── expr()
+                ├── term()
+                │   └── factor()
+                │       └── NumberNode("2")
+                ├── sees PLUS
+                └── term()
+                    ├── factor()
+                    │   └── NumberNode("3")
+                    ├── sees STAR
+                    └── factor()
+                        └── NumberNode("4")</pre>
+
+<h3>20.3 Final AST</h3>
+
+<pre>ProgramNode
+└── AssignNode("x")
+    └── BinaryOpNode("+")
+        ├── NumberNode("2")
+        └── BinaryOpNode("*")
+            ├── NumberNode("3")
+            └── NumberNode("4")</pre>
+
+<h2>21. Full Parser Walkthrough: Factorial Program</h2>
+
+<h3>21.1 Source</h3>
+
+<pre>fact(5)
+
+func fact(n) {
+    if n == 0 {
+        1
+    }
+    else {
+        n * fact(n - 1)
+    }
+}</pre>
+
+<h3>21.2 Top-Level AST</h3>
+
+<pre>ProgramNode
+├── FunctionCallNode("fact")
+│   └── NumberNode("5")
+└── FunctionDefNode("fact")
+    ├── params: ["n"]
+    └── body:
+        └── IfNode</pre>
+
+<h3>21.3 Expanded AST</h3>
+
+<pre>ProgramNode
+├── FunctionCallNode("fact")
+│   └── args:
+│       └── NumberNode("5")
+└── FunctionDefNode("fact")
+    ├── params:
+    │   └── "n"
+    └── body:
+        └── IfNode
+            ├── condition:
+            │   └── CompareNode("==")
+            │       ├── VariableNode("n")
+            │       └── NumberNode("0")
+            ├── ifBody:
+            │   └── NumberNode("1")
+            └── elseBody:
+                └── BinaryOpNode("*")
+                    ├── VariableNode("n")
+                    └── FunctionCallNode("fact")
+                        └── args:
+                            └── BinaryOpNode("-")
+                                ├── VariableNode("n")
+                                └── NumberNode("1")</pre>
+
+<h3>21.4 Parser Concept</h3>
+
+<p>
+  The parser does not execute recursion. It only recognizes that the function body contains a call to <code>fact</code>.
+  Recursion happens later in the VM when bytecode execution reaches <code>OP_CALL fact</code>.
+</p>
+
+<div class="callout">
+  <strong>Important distinction:</strong> the parser builds the structure of recursive code. The VM performs recursive execution.
+</div>
+
+<h2>22. Common Beginner Confusions</h2>
+
+<h3>22.1 Does The Parser Calculate <code>2 + 3</code>?</h3>
+
+<p>
+  No. The parser does not evaluate expressions. It only builds a tree that says an addition should happen later.
+</p>
+
+<pre>BinaryOpNode("+")
+├── NumberNode("2")
+└── NumberNode("3")</pre>
+
+<p>
+  The compiler turns that into bytecode, and the VM performs the actual addition.
+</p>
+
+<h3>22.2 Does The AST Store Every Token?</h3>
+
+<p>
+  No. The AST does not store every token. It stores meaning. For example, braces are not AST nodes.
+  Braces only tell the parser where a block starts and ends.
+</p>
+
+<h3>22.3 Why Are There Separate BinaryOpNode And CompareNode?</h3>
+
+<p>
+  The project uses <code>BinaryOpNode</code> for arithmetic and <code>CompareNode</code> for comparisons.
+  This is not the only possible design. Some interpreters use one generic binary operation node for both.
+  This project separates them so the compiler can emit arithmetic opcodes separately from comparison opcodes.
+</p>
+
+<h3>22.4 Why Does Function Body Use A Vector?</h3>
+
+<p>
+  A function body can contain multiple statements. Therefore <code>FunctionDefNode</code> stores:
+</p>
+
+<pre>vector&lt;AST*&gt; body;</pre>
+
+<p>
+  The same pattern is used for program statements, if body, else body, and while body.
+</p>
+
+<h2>23. Parser Limitations In This Project</h2>
+
+<table>
+  <tr>
+    <th>Limitation</th>
+    <th>Explanation</th>
+  </tr>
+  <tr>
+    <td>No syntax errors</td>
+    <td>The parser assumes valid input and does not produce helpful error messages.</td>
+  </tr>
+  <tr>
+    <td>No line/column tracking</td>
+    <td>Tokens do not store source locations, so the parser cannot report exact error positions.</td>
+  </tr>
+  <tr>
+    <td>Unsafe lookahead</td>
+    <td>Uses <code>tokens[pos + 1]</code> without explicit bounds checks.</td>
+  </tr>
+  <tr>
+    <td>No unary minus</td>
+    <td><code>-5</code> is not parsed as one negative number or unary expression.</td>
+  </tr>
+  <tr>
+    <td>No explicit return statement</td>
+    <td>Function return behavior is based on the final value left by compiled body expressions.</td>
+  </tr>
+  <tr>
+    <td>Raw pointer ownership</td>
+    <td>AST nodes are allocated with <code>new</code> and are not deleted.</td>
+  </tr>
+</table>
+
+<h2>24. How A Production Parser Would Improve This</h2>
+
+<ul>
+  <li>Add token source locations: line and column.</li>
+  <li>Add an <code>expect()</code> helper for required tokens.</li>
+  <li>Report syntax errors instead of silently continuing.</li>
+  <li>Use <code>unique_ptr&lt;AST&gt;</code> instead of raw pointers.</li>
+  <li>Add unary expression support.</li>
+  <li>Add a return statement node.</li>
+  <li>Add better block parsing helpers to avoid duplicate brace logic.</li>
+  <li>Add tests for every grammar rule.</li>
+</ul>
+
+<h3>24.1 Example expect Helper</h3>
+
+<pre>Token Parser::expect(TokenType expected, string message) {
+    if (currentToken.type != expected) {
+        throw runtime_error(message);
+    }
+
+    Token token = currentToken;
+    advance();
+    return token;
+}</pre>
+
+<p>
+  Then parsing a parenthesized expression could say:
+</p>
+
+<pre>expect(LPAREN, "Expected '('");
+AST* node = comparison();
+expect(RPAREN, "Expected ')'");</pre>
+
+<h2>25. How To Think Like A Compiler Engineer</h2>
+
+<p>
+  When reading parser code, always ask:
+</p>
+
+<ul>
+  <li>What grammar rule is this function implementing?</li>
+  <li>What tokens does it consume?</li>
+  <li>What AST node does it return?</li>
+  <li>What happens if the input is invalid?</li>
+  <li>How does this function preserve precedence?</li>
+  <li>Is the parse left-associative or right-associative?</li>
+  <li>Does the AST represent syntax or meaning?</li>
+</ul>
+
+<p>
+  For your project, the most important mental model is:
+</p>
+
+<pre>Tokens are flat.
+Parser finds structure.
+AST stores meaning.
+Compiler lowers meaning to bytecode.
+VM executes bytecode.</pre>
+
+<h2>26. Practice Exercises</h2>
+
+<h3>26.1 Draw The AST</h3>
+
+<p>For this program:</p>
+
+<pre>x = (1 + 2) * 3</pre>
+
+<p>Expected AST:</p>
+
+<pre>AssignNode("x")
+└── BinaryOpNode("*")
+    ├── BinaryOpNode("+")
+    │   ├── NumberNode("1")
+    │   └── NumberNode("2")
+    └── NumberNode("3")</pre>
+
+<h3>26.2 Predict The Parser Functions</h3>
+
+<p>For this expression:</p>
+
+<pre>a + b * c</pre>
+
+<p>Function flow:</p>
+
+<pre>comparison()
+└── expr()
+    ├── term()
+    │   └── factor() -> VariableNode("a")
+    ├── PLUS
+    └── term()
+        ├── factor() -> VariableNode("b")
+        ├── STAR
+        └── factor() -> VariableNode("c")</pre>
+
+<h3>26.3 Identify The Node Type</h3>
+
+<table>
+  <tr>
+    <th>Source</th>
+    <th>Main AST Node</th>
+  </tr>
+  <tr>
+    <td><code>10</code></td>
+    <td><code>NumberNode</code></td>
+  </tr>
+  <tr>
+    <td><code>x</code></td>
+    <td><code>VariableNode</code></td>
+  </tr>
+  <tr>
+    <td><code>x = 10</code></td>
+    <td><code>AssignNode</code></td>
+  </tr>
+  <tr>
+    <td><code>x + 1</code></td>
+    <td><code>BinaryOpNode</code></td>
+  </tr>
+  <tr>
+    <td><code>x == 1</code></td>
+    <td><code>CompareNode</code></td>
+  </tr>
+  <tr>
+    <td><code>fact(5)</code></td>
+    <td><code>FunctionCallNode</code></td>
+  </tr>
+  <tr>
+    <td><code>func f(x) { x }</code></td>
+    <td><code>FunctionDefNode</code></td>
+  </tr>
+</table>
+
+<h2>27. Final Summary</h2>
+
+<p>
+  The parser and AST are the core understanding layer of this interpreter.
+  The lexer only gives a flat token stream. The parser turns that stream into a meaningful tree.
+  The AST then becomes the input for compilation.
+</p>
+
+<p>
+  In this project:
+</p>
+
+<ul>
+  <li><code>parser.cpp</code> implements a recursive descent parser.</li>
+  <li><code>ast.h</code> defines the tree nodes.</li>
+  <li>Operator precedence is handled by separating <code>factor</code>, <code>term</code>, <code>expr</code>, and <code>comparison</code>.</li>
+  <li>Statements are selected by <code>statement()</code>.</li>
+  <li>The final program tree is wrapped in <code>ProgramNode</code>.</li>
+  <li>The compiler later walks the AST and emits bytecode.</li>
+</ul>
+
+<p>
+  Once you understand the parser and AST, the rest of the project becomes easier:
+  the compiler simply maps each AST node type to bytecode, and the VM executes that bytecode.
+</p>
+
+</body>
+</html>

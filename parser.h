@@ -12,7 +12,7 @@ public:
 
     vector<Token> tokens;
 
-    int pos;
+    size_t pos;
 
     Token currentToken;
 
@@ -28,6 +28,8 @@ public:
 
     AST* factor();
 
+    AST* unary();
+
     AST* statement();
 
     AST* program();
@@ -40,5 +42,9 @@ public:
 
     AST* functionDefinition();
 
-AST* functionCall();
+    AST* functionCall();
+
+    AST* returnStatement();
+
+    AST* printStatement();
 };

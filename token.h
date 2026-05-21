@@ -16,9 +16,12 @@ enum TokenType {
 
     EQUAL,
     EQUAL_EQUAL,
+    BANG_EQUAL,
 
     GREATER,
+    GREATER_EQUAL,
     LESS,
+    LESS_EQUAL,
 
     LPAREN,
     RPAREN,
@@ -30,6 +33,10 @@ enum TokenType {
     ELSE,
     WHILE,
     FUNC,
+    RETURN,
+    PRINT,
+    TRUE,
+    FALSE,
     COMMA,
 
     EOF_TOKEN

@@ -9,7 +9,15 @@ Lexer::Lexer(string input) {
 
     pos = 0;
 
-    currentChar = text[pos];
+    if (text.empty()) {
+
+        currentChar = '\0';
+    }
+
+    else {
+
+        currentChar = text[pos];
+    }
 }
 
 void Lexer::advance() {
@@ -84,6 +92,34 @@ vector<Token> Lexer::tokenize() {
                 );
             }
 
+            else if (name == "return") {
+
+                tokens.push_back(
+                    Token(RETURN, "return")
+                );
+            }
+
+            else if (name == "print") {
+
+                tokens.push_back(
+                    Token(PRINT, "print")
+                );
+            }
+
+            else if (name == "true") {
+
+                tokens.push_back(
+                    Token(TRUE, "true")
+                );
+            }
+
+            else if (name == "false") {
+
+                tokens.push_back(
+                    Token(FALSE, "false")
+                );
+            }
+
             else {
 
                 tokens.push_back(
@@ -110,6 +146,20 @@ vector<Token> Lexer::tokenize() {
                 tokens.push_back(
                     Token(EQUAL, "=")
                 );
+            }
+        }
+
+        else if (currentChar == '!') {
+
+            advance();
+
+            if (currentChar == '=') {
+
+                tokens.push_back(
+                    Token(BANG_EQUAL, "!=")
+                );
+
+                advance();
             }
         }
 
@@ -142,11 +192,36 @@ vector<Token> Lexer::tokenize() {
 
         else if (currentChar == '/') {
 
-            tokens.push_back(
-                Token(SLASH, "/")
-            );
-
             advance();
+
+            if (currentChar == '/') {
+
+                while (
+                    currentChar != '\n' &&
+                    currentChar != '\0'
+                ) {
+
+                    advance();
+                }
+            }
+
+            else {
+
+                tokens.push_back(
+                    Token(SLASH, "/")
+                );
+            }
+        }
+
+        else if (currentChar == '#') {
+
+            while (
+                currentChar != '\n' &&
+                currentChar != '\0'
+            ) {
+
+                advance();
+            }
         }
 
         else if (currentChar == '(') {
@@ -187,20 +262,44 @@ vector<Token> Lexer::tokenize() {
 
         else if (currentChar == '>') {
 
+            advance();
+
+            if (currentChar == '=') {
+
+                tokens.push_back(
+                    Token(GREATER_EQUAL, ">=")
+                );
+
+                advance();
+            }
+
+            else {
+
             tokens.push_back(
                 Token(GREATER, ">")
             );
-
-            advance();
+            }
         }
 
         else if (currentChar == '<') {
 
+            advance();
+
+            if (currentChar == '=') {
+
+                tokens.push_back(
+                    Token(LESS_EQUAL, "<=")
+                );
+
+                advance();
+            }
+
+            else {
+
             tokens.push_back(
                 Token(LESS, "<")
             );
-
-            advance();
+            }
         }
 
         else if (currentChar == ',') {

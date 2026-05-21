@@ -34,6 +34,17 @@ public:
     }
 };
 
+class UnaryOpNode : public AST {
+public:
+    string op;
+    AST* expression;
+
+    UnaryOpNode(string o, AST* expr) {
+        op = o;
+        expression = expr;
+    }
+};
+
 class VariableNode : public AST {
 
 public:
@@ -142,6 +153,18 @@ public:
     }
 };
 
+class BooleanNode : public AST {
+
+public:
+
+    bool value;
+
+    BooleanNode(bool v) {
+
+        value = v;
+    }
+};
+
 class FunctionDefNode : public AST {
 
 public:
@@ -182,5 +205,29 @@ public:
         name = n;
 
         args = a;
+    }
+};
+
+class ReturnNode : public AST {
+
+public:
+
+    AST* value;
+
+    ReturnNode(AST* v) {
+
+        value = v;
+    }
+};
+
+class PrintNode : public AST {
+
+public:
+
+    AST* value;
+
+    PrintNode(AST* v) {
+
+        value = v;
     }
 };

@@ -2,8 +2,8 @@
 
 #include "ast.h"
 #include "instruction.h"
+#include "codeobject.h"
 
-#include <vector>
 #include <map>
 
 using namespace std;
@@ -12,11 +12,12 @@ class Compiler {
 
 public:
 
-    vector<Instruction>
-        instructions;
+    CodeObject code;
 
-    map<string,int>
-        functions;
+    map<
+        string,
+        CodeObject
+    > functions;
 
     void compile(AST* node);
 };

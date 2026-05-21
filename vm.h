@@ -2,19 +2,13 @@
 
 #include <vector>
 #include <map>
+#include <string>
 
 #include "instruction.h"
+#include "frame.h"
+#include "codeobject.h"
 
 using namespace std;
-
-class Frame {
-
-public:
-
-    map<string,int> locals;
-
-    int returnAddress;
-};
 
 class VM {
 
@@ -24,20 +18,19 @@ public:
 
     vector<Frame> frames;
 
-    map<string,int> functions;
+    map<string, int> globals;
 
+    map<
+        string,
+        CodeObject
+    > functions;
 
     int getVariable(string name);
 
-        void setVariable(
-            string name,
-            int value
-        );
-
-
-
+    void setVariable(string name, int value);
 
     int run(
-        vector<Instruction>& code
+        CodeObject& code,
+        bool resetGlobals = true
     );
 };

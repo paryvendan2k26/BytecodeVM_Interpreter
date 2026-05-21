@@ -34,13 +34,28 @@ AST* Parser::factor() {
     }
 
     else if (
+        currentToken.type == TRUE ||
+        currentToken.type == FALSE
+    ) {
+
+        AST* node =
+            new BooleanNode(
+                currentToken.type == TRUE
+            );
+
+        advance();
+
+        return node;
+    }
+
+    else if (
         currentToken.type ==
         IDENTIFIER
     ) {
 
         if (
-            tokens[pos + 1].type
-            == LPAREN
+            pos + 1 < tokens.size() &&
+            tokens[pos + 1].type == LPAREN
         ) {
 
             return functionCall();
@@ -73,9 +88,26 @@ AST* Parser::factor() {
     return nullptr;
 }
 
+AST* Parser::unary() {
+
+    if (currentToken.type == MINUS) {
+
+        string op = currentToken.value;
+
+        advance();
+
+        return new UnaryOpNode(
+            op,
+            unary()
+        );
+    }
+
+    return factor();
+}
+
 AST* Parser::term() {
 
-    AST* node = factor();
+    AST* node = unary();
 
     while (
         currentToken.type == STAR ||
@@ -86,7 +118,7 @@ AST* Parser::term() {
 
         advance();
 
-        AST* right = factor();
+        AST* right = unary();
 
         node =
             new BinaryOpNode(node, op, right);
@@ -125,7 +157,13 @@ AST* Parser::comparison() {
 
         currentToken.type == GREATER ||
 
+        currentToken.type == GREATER_EQUAL ||
+
         currentToken.type == LESS ||
+
+        currentToken.type == LESS_EQUAL ||
+
+        currentToken.type == BANG_EQUAL ||
 
         currentToken.type == EQUAL_EQUAL
     ) {
@@ -229,8 +267,19 @@ AST* Parser::statement() {
         return whileStatement();
     }
 
+    if (currentToken.type == RETURN) {
+
+        return returnStatement();
+    }
+
+    if (currentToken.type == PRINT) {
+
+        return printStatement();
+    }
+
     if (
         currentToken.type == IDENTIFIER &&
+        pos + 1 < tokens.size() &&
         tokens[pos + 1].type == EQUAL
     ) {
 
@@ -240,13 +289,9 @@ AST* Parser::statement() {
 
         advance();
 
-        AST* value =
-            comparison();
+        AST* value = comparison();
 
-        return new AssignNode(
-            name,
-            value
-        );
+        return new AssignNode(name, value);
     }
 
     return comparison();
@@ -392,6 +437,36 @@ AST* Parser::functionCall() {
         name,
         args
     );
+}
+
+AST* Parser::returnStatement() {
+
+    advance();
+
+    AST* value =
+        comparison();
+
+    return new ReturnNode(value);
+}
+
+AST* Parser::printStatement() {
+
+    advance();
+
+    if (currentToken.type == LPAREN) {
+
+        advance();
+    }
+
+    AST* value =
+        comparison();
+
+    if (currentToken.type == RPAREN) {
+
+        advance();
+    }
+
+    return new PrintNode(value);
 }
 
 

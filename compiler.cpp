@@ -4,176 +4,211 @@ using namespace std;
 
 void Compiler::compile(AST* node) {
 
-    FunctionDefNode* funcNode =
-    dynamic_cast<FunctionDefNode*>(node);
+    ProgramNode* programNode =
+        dynamic_cast<ProgramNode*>(node);
 
-        if (funcNode != nullptr) {
+    if (programNode != nullptr) {
 
-            functions[
-                funcNode->name
-            ] = instructions.size();
+        code.name = "<module>";
 
-            for (
-                string param :
-                funcNode->params
-            ) {
+        for (AST* stmt : programNode->statements) {
 
-                instructions.push_back(
-                    Instruction(
-                        OP_STORE_NAME,
-                        param
-                    )
-                );
-            }
+            FunctionDefNode* funcNode =
+                dynamic_cast<FunctionDefNode*>(stmt);
 
-            for (
-                AST* stmt :
-                funcNode->body
-            ) {
+            if (funcNode != nullptr) {
 
                 compile(stmt);
             }
-
-            instructions.push_back(
-                Instruction(OP_RETURN)
-            );
-
-            return;
         }
 
-        FunctionCallNode* callNode =
-    dynamic_cast<FunctionCallNode*>(node);
+        for (AST* stmt : programNode->statements) {
 
-            if (callNode != nullptr) {
+            FunctionDefNode* funcNode =
+                dynamic_cast<FunctionDefNode*>(stmt);
 
-                for (
-                    AST* arg :
-                    callNode->args
-                ) {
+            if (funcNode == nullptr) {
 
-                    compile(arg);
-                }
-
-                instructions.push_back(
-                    Instruction(
-                        OP_CALL,
-                        callNode->name
-                    )
-                );
-
-                return;
+                compile(stmt);
             }
-
-            VariableNode* varNode =
-            dynamic_cast<VariableNode*>(node);
-
-        if (varNode != nullptr) {
-
-            instructions.push_back(
-                Instruction(
-                    OP_LOAD_NAME,
-                    varNode->name
-                )
-            );
-
-            return;
         }
 
-        AssignNode* assignNode =
-            dynamic_cast<AssignNode*>(node);
+        return;
+    }
 
-        if (assignNode != nullptr) {
+    FunctionDefNode* funcNode =
+        dynamic_cast<FunctionDefNode*>(node);
 
-            compile(assignNode->value);
+    if (funcNode != nullptr) {
 
-            instructions.push_back(
+        Compiler functionCompiler;
+
+        functionCompiler.code.name =
+            funcNode->name;
+
+        functionCompiler.code.parameters =
+            funcNode->params;
+
+        for (
+            int i = static_cast<int>(
+                funcNode->params.size()
+            ) - 1;
+            i >= 0;
+            i--
+        ) {
+
+            functionCompiler.code.instructions.push_back(
                 Instruction(
                     OP_STORE_NAME,
-                    assignNode->name
+                    funcNode->params[i]
                 )
             );
-
-            return;
         }
 
-            ProgramNode* programNode =
-                dynamic_cast<ProgramNode*>(node);
+        for (AST* stmt : funcNode->body) {
 
-            if (programNode != nullptr) {
+            functionCompiler.compile(stmt);
+        }
 
-                int jumpIndex =
-                    instructions.size();
+        functionCompiler.code.instructions.push_back(
+            Instruction(OP_RETURN)
+        );
 
-                instructions.push_back(
-                    Instruction(
-                        OP_JUMP,
-                        "0"
-                    )
-                );
+        functions[funcNode->name] =
+            functionCompiler.code;
 
-                vector<AST*> functionsList;
-                vector<AST*> mainStatements;
+        for (auto& entry : functionCompiler.functions) {
 
-                for (
-                    AST* stmt :
-                    programNode->statements
-                ) {
+            functions[entry.first] =
+                entry.second;
+        }
 
-                    FunctionDefNode* funcNode =
+        return;
+    }
 
-                        dynamic_cast<
-                            FunctionDefNode*
-                        >(stmt);
+    FunctionCallNode* callNode =
+        dynamic_cast<FunctionCallNode*>(node);
 
-                    if (funcNode != nullptr) {
+    if (callNode != nullptr) {
 
-                        functionsList.push_back(
-                            stmt
-                        );
-                    }
+        for (AST* arg : callNode->args) {
 
-                    else {
+            compile(arg);
+        }
 
-                        mainStatements.push_back(
-                            stmt
-                        );
-                    }
-                }
+        code.instructions.push_back(
+            Instruction(
+                OP_CALL,
+                callNode->name
+            )
+        );
 
-                for (
-                    AST* stmt :
-                    functionsList
-                ) {
+        return;
+    }
 
-                    compile(stmt);
-                }
+    ReturnNode* returnNode =
+        dynamic_cast<ReturnNode*>(node);
 
-                instructions[jumpIndex]
-                    .argument =
-                    to_string(
-                        instructions.size()
-                    );
+    if (returnNode != nullptr) {
 
-                for (
-                    AST* stmt :
-                    mainStatements
-                ) {
+        compile(returnNode->value);
 
-                    compile(stmt);
-                }
+        code.instructions.push_back(
+            Instruction(OP_RETURN)
+        );
 
-                return;
-            }
+        return;
+    }
+
+    PrintNode* printNode =
+        dynamic_cast<PrintNode*>(node);
+
+    if (printNode != nullptr) {
+
+        compile(printNode->value);
+
+        code.instructions.push_back(
+            Instruction(OP_PRINT)
+        );
+
+        return;
+    }
+
+    VariableNode* varNode =
+        dynamic_cast<VariableNode*>(node);
+
+    if (varNode != nullptr) {
+
+        code.instructions.push_back(
+            Instruction(
+                OP_LOAD_NAME,
+                varNode->name
+            )
+        );
+
+        return;
+    }
+
+    AssignNode* assignNode =
+        dynamic_cast<AssignNode*>(node);
+
+    if (assignNode != nullptr) {
+
+        compile(assignNode->value);
+
+        code.instructions.push_back(
+            Instruction(
+                OP_STORE_NAME,
+                assignNode->name
+            )
+        );
+
+        return;
+    }
+
+    BooleanNode* booleanNode =
+        dynamic_cast<BooleanNode*>(node);
+
+    if (booleanNode != nullptr) {
+
+        code.constants.push_back(
+            booleanNode->value ? 1 : 0
+        );
+
+        int index =
+            static_cast<int>(
+                code.constants.size()
+            ) - 1;
+
+        code.instructions.push_back(
+            Instruction(
+                OP_LOAD_CONST,
+                to_string(index)
+            )
+        );
+
+        return;
+    }
 
     NumberNode* numberNode =
         dynamic_cast<NumberNode*>(node);
 
     if (numberNode != nullptr) {
 
-        instructions.push_back(
+        int value =
+            stoi(numberNode->value);
+
+        code.constants.push_back(value);
+
+        int index =
+            static_cast<int>(
+                code.constants.size()
+            ) - 1;
+
+        code.instructions.push_back(
             Instruction(
                 OP_LOAD_CONST,
-                numberNode->value
+                to_string(index)
             )
         );
 
@@ -181,143 +216,159 @@ void Compiler::compile(AST* node) {
     }
 
     CompareNode* compareNode =
-    dynamic_cast<CompareNode*>(node);
+        dynamic_cast<CompareNode*>(node);
 
-        if (compareNode != nullptr) {
+    if (compareNode != nullptr) {
 
-            compile(compareNode->left);
+        compile(compareNode->left);
 
-            compile(compareNode->right);
+        compile(compareNode->right);
 
-            if (compareNode->op == ">") {
+        if (compareNode->op == ">") {
 
-                instructions.push_back(
-                    Instruction(OP_COMPARE_GT)
-                );
-            }
-
-            else if (compareNode->op == "<") {
-
-                instructions.push_back(
-                    Instruction(OP_COMPARE_LT)
-                );
-            }
-
-            else if (compareNode->op == "==") {
-
-                instructions.push_back(
-                    Instruction(OP_COMPARE_EQ)
-                );
-            }
-
-            return;
+            code.instructions.push_back(
+                Instruction(OP_COMPARE_GT)
+            );
         }
 
-            IfNode* ifNode =
-                dynamic_cast<IfNode*>(node);
+        else if (compareNode->op == ">=") {
 
-            if (ifNode != nullptr) {
-
-                compile(ifNode->condition);
-
-                int falseJumpIndex =
-                    instructions.size();
-
-                instructions.push_back(
-                    Instruction(
-                        OP_JUMP_IF_FALSE,
-                        "0"
-                    )
-                );
-
-                for (
-                    AST* stmt :
-                    ifNode->ifBody
-                ) {
-
-                    compile(stmt);
-                }
-
-                int endJumpIndex =
-                    instructions.size();
-
-                instructions.push_back(
-                    Instruction(
-                        OP_JUMP,
-                        "0"
-                    )
-                );
-
-                instructions[falseJumpIndex]
-                    .argument =
-                    to_string(
-                        instructions.size()
-                    );
-
-                for (
-                    AST* stmt :
-                    ifNode->elseBody
-                ) {
-
-                    compile(stmt);
-                }
-
-                instructions[endJumpIndex]
-                    .argument =
-                    to_string(
-                        instructions.size()
-                    );
-
-                return;
-            }
-
-                WhileNode* whileNode =
-            dynamic_cast<WhileNode*>(node);
-
-        if (whileNode != nullptr) {
-
-            int loopStart =
-                instructions.size();
-
-            compile(
-                whileNode->condition
+            code.instructions.push_back(
+                Instruction(OP_COMPARE_GE)
             );
-
-            int jumpIndex =
-                instructions.size();
-
-            instructions.push_back(
-                Instruction(
-                    OP_JUMP_IF_FALSE,
-                    "0"
-                )
-            );
-
-            for (
-                AST* stmt :
-                whileNode->body
-            ) {
-
-                compile(stmt);
-            }
-
-            instructions.push_back(
-                Instruction(
-                    OP_JUMP,
-                    to_string(loopStart)
-                )
-            );
-
-            instructions[jumpIndex]
-                .argument =
-                to_string(
-                    instructions.size()
-                );
-
-            return;
         }
 
-        
+        else if (compareNode->op == "<") {
+
+            code.instructions.push_back(
+                Instruction(OP_COMPARE_LT)
+            );
+        }
+
+        else if (compareNode->op == "<=") {
+
+            code.instructions.push_back(
+                Instruction(OP_COMPARE_LE)
+            );
+        }
+
+        else if (compareNode->op == "==") {
+
+            code.instructions.push_back(
+                Instruction(OP_COMPARE_EQ)
+            );
+        }
+
+        else if (compareNode->op == "!=") {
+
+            code.instructions.push_back(
+                Instruction(OP_COMPARE_NE)
+            );
+        }
+
+        return;
+    }
+
+    IfNode* ifNode =
+        dynamic_cast<IfNode*>(node);
+
+    if (ifNode != nullptr) {
+
+        compile(ifNode->condition);
+
+        int falseJumpIndex =
+            static_cast<int>(
+                code.instructions.size()
+            );
+
+        code.instructions.push_back(
+            Instruction(
+                OP_JUMP_IF_FALSE,
+                "0"
+            )
+        );
+
+        for (AST* stmt : ifNode->ifBody) {
+
+            compile(stmt);
+        }
+
+        int endJumpIndex =
+            static_cast<int>(
+                code.instructions.size()
+            );
+
+        code.instructions.push_back(
+            Instruction(
+                OP_JUMP,
+                "0"
+            )
+        );
+
+        code.instructions[falseJumpIndex]
+            .argument =
+            to_string(
+                code.instructions.size()
+            );
+
+        for (AST* stmt : ifNode->elseBody) {
+
+            compile(stmt);
+        }
+
+        code.instructions[endJumpIndex]
+            .argument =
+            to_string(
+                code.instructions.size()
+            );
+
+        return;
+    }
+
+    WhileNode* whileNode =
+        dynamic_cast<WhileNode*>(node);
+
+    if (whileNode != nullptr) {
+
+        int loopStart =
+            static_cast<int>(
+                code.instructions.size()
+            );
+
+        compile(whileNode->condition);
+
+        int jumpIndex =
+            static_cast<int>(
+                code.instructions.size()
+            );
+
+        code.instructions.push_back(
+            Instruction(
+                OP_JUMP_IF_FALSE,
+                "0"
+            )
+        );
+
+        for (AST* stmt : whileNode->body) {
+
+            compile(stmt);
+        }
+
+        code.instructions.push_back(
+            Instruction(
+                OP_JUMP,
+                to_string(loopStart)
+            )
+        );
+
+        code.instructions[jumpIndex]
+            .argument =
+            to_string(
+                code.instructions.size()
+            );
+
+        return;
+    }
 
     BinaryOpNode* binNode =
         dynamic_cast<BinaryOpNode*>(node);
@@ -330,33 +381,49 @@ void Compiler::compile(AST* node) {
 
         if (binNode->op == "+") {
 
-            instructions.push_back(
+            code.instructions.push_back(
                 Instruction(OP_ADD)
             );
         }
 
         else if (binNode->op == "-") {
 
-            instructions.push_back(
+            code.instructions.push_back(
                 Instruction(OP_SUB)
             );
         }
 
         else if (binNode->op == "*") {
 
-            instructions.push_back(
+            code.instructions.push_back(
                 Instruction(OP_MUL)
             );
         }
 
         else if (binNode->op == "/") {
 
-            instructions.push_back(
+            code.instructions.push_back(
                 Instruction(OP_DIV)
             );
         }
 
         return;
     }
-}
 
+    UnaryOpNode* unaryNode =
+        dynamic_cast<UnaryOpNode*>(node);
+
+    if (unaryNode != nullptr) {
+
+        compile(unaryNode->expression);
+
+        if (unaryNode->op == "-") {
+
+            code.instructions.push_back(
+                Instruction(OP_NEGATE)
+            );
+        }
+
+        return;
+    }
+}

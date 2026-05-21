@@ -8,7 +8,7 @@ using namespace std;
 class Lexer {
 public:
     string text;
-    int pos;
+    size_t pos;
     char currentChar;
 
     Lexer(string input);

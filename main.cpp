@@ -10,19 +10,26 @@ using namespace std;
 
 int main() {
 
-string input =
+string input = 
 
-"fact(5) "
+"// Recursive factorial demo with explicit return and print.\n"
+"flag = true\n"
+"print(flag)\n"
+"print(-5)\n"
+"print(5 != 4)\n"
+"print(5 >= 5)\n"
+"print(3 <= 4)\n"
+"fact(5)\n"
 
-"func fact(n) { "
+"func fact(n) {\n"
 
-"if n == 0 { "
-"1 "
-"} "
+"if n == 0 {\n"
+"return 1\n"
+"}\n"
 
-"else { "
-"n * fact(n - 1) "
-"} "
+"else {\n"
+"return n * fact(n - 1)\n"
+"}\n"
 
 "}";
     Lexer lexer(input);
@@ -44,10 +51,9 @@ string input =
     vm.functions =
         compiler.functions;
 
-    int result =
-        vm.run(
-            compiler.instructions
-        );
+    int result = vm.run(
+        compiler.code
+    );
 
     cout << "Result = "
          << result
