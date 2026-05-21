@@ -66,6 +66,33 @@ g++ -std=c++17 main.cpp lexer.cpp parser.cpp compiler.cpp vm.cpp -o interpreter
 
 The current entry point uses a hardcoded demo program in `main.cpp`.
 
+## REPL
+
+Start the interactive prompt with:
+
+```bash
+./interpreter --repl
+```
+
+Example session:
+
+```text
+>>> x = 10
+=> 10
+>>> print(x >= 10)
+1
+=> 1
+>>> func double(n) {
+... return n * 2
+... }
+=> 0
+>>> double(21)
+=> 42
+>>> exit
+```
+
+The REPL keeps variables and function definitions available across inputs.
+
 ## Project Structure
 
 - `lexer.*`: converts source text into tokens

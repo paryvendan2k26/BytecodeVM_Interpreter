@@ -163,6 +163,13 @@ void Compiler::compile(AST* node) {
             )
         );
 
+        code.instructions.push_back(
+            Instruction(
+                OP_LOAD_NAME,
+                assignNode->name
+            )
+        );
+
         return;
     }
 
