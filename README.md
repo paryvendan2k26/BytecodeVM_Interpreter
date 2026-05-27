@@ -99,17 +99,8 @@ Run:
 - Instruction Dispatching
 - Scope Resolution
 - Function Execution Model
-
----
-
-# Future Work
-
-- Garbage Collection
-- Heap Objects
-- Closures
-- Classes & Objects
-- Bytecode Optimizations
 - REPL & Debugger
+
 
 ---
 
